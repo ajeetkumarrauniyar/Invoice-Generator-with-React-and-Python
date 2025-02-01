@@ -170,6 +170,9 @@ export default function InvoiceForm() {
       const response = await axios.post('/api/generateInvoices', data, {
         responseType: 'blob',
         timeout: 30000, // 30 second timeout
+        headers: {
+          'Content-Type': 'application/json'
+        }
       })
 
       const contentType = response.headers['content-type']
@@ -184,12 +187,21 @@ export default function InvoiceForm() {
               description: errorData.message || 'An error occurred while generating invoices'
             })
           } catch (err) {
+            console.error('Error parsing error response:', err)
             toast({
               variant: "destructive",
               title: "Error",
               description: 'Failed to parse error response from server'
             })
           }
+        }
+        reader.onerror = () => {
+          console.error('Error reading error response:', reader.error)
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: 'Failed to read error response from server'
+          })
         }
         reader.readAsText(response.data)
         return
@@ -205,7 +217,7 @@ export default function InvoiceForm() {
         return
       }
 
-      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }))
       const link = document.createElement('a')
       link.href = url
       link.setAttribute('download', 'invoices.csv')
@@ -225,16 +237,57 @@ export default function InvoiceForm() {
       if (err.code === 'ECONNABORTED') {
         errorMessage = 'Request timed out. Please try again.'
       } else if (err.response) {
-        errorMessage = err.response.data?.message || 'Server error occurred'
+        // Try to read the error message from the blob response
+        try {
+          const reader = new FileReader()
+          reader.onload = () => {
+            try {
+              const errorData = JSON.parse(reader.result)
+              toast({
+                variant: "destructive",
+                title: "Error",
+                description: errorData.message || 'Server error occurred'
+              })
+            } catch (parseErr) {
+              console.error('Error parsing error response:', parseErr)
+              toast({
+                variant: "destructive",
+                title: "Error",
+                description: 'Server error occurred'
+              })
+            }
+          }
+          reader.onerror = () => {
+            console.error('Error reading error response:', reader.error)
+            toast({
+              variant: "destructive",
+              title: "Error",
+              description: 'Server error occurred'
+            })
+          }
+          reader.readAsText(err.response.data)
+        } catch (blobErr) {
+          console.error('Error handling blob response:', blobErr)
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: err.response.data?.message || 'Server error occurred'
+          })
+        }
       } else if (err.request) {
         errorMessage = 'Unable to reach the server. Please check your connection.'
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: errorMessage
+        })
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: errorMessage
+        })
       }
-      
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: errorMessage
-      })
     } finally {
       setIsLoading(false)
     }

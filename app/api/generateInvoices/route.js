@@ -5,6 +5,11 @@ import path from 'path'
 import fs from 'fs/promises'
 import os from 'os'
 
+export const config = {
+  runtime: 'edge',
+  regions: ['fra1'], // Choose the region closest to your users
+}
+
 export async function POST(request) {
   let partyDataPath = null;
   let pythonProcess = null;
@@ -21,7 +26,7 @@ export async function POST(request) {
     }
 
     // Create a temporary file for the party data
-    const tempDir = process.env.VERCEL ? '/tmp' : path.join(process.cwd(), 'temp')
+    const tempDir = path.join(os.tmpdir(), 'invoice-generator')
     try {
       await fs.mkdir(tempDir, { recursive: true })
     } catch (err) {
@@ -32,17 +37,8 @@ export async function POST(request) {
     await writeFile(partyDataPath, data.partyData)
 
     // Get the Python executable path and script path
-    let pythonPath, scriptPath
-    
-    if (process.env.VERCEL) {
-      // In Vercel, we need to use the Python runtime from the Lambda environment
-      pythonPath = process.env.PYTHON_PATH || '/var/lang/bin/python3'
-      scriptPath = path.join('/var/task', 'scripts', 'generate_invoices.py')
-    } else {
-      // Local development
-      pythonPath = path.join(process.cwd(), 'venv', 'bin', 'python3')
-      scriptPath = path.join(process.cwd(), 'scripts', 'generate_invoices.py')
-    }
+    const pythonPath = process.env.PYTHON_PATH || 'python3'
+    const scriptPath = path.join(process.cwd(), 'scripts', 'generate_invoices.py')
     
     // Prepare the Python script arguments
     const scriptArgs = [
@@ -59,7 +55,6 @@ export async function POST(request) {
     ]
 
     console.log('Environment:', process.env.NODE_ENV)
-    console.log('Is Vercel:', !!process.env.VERCEL)
     console.log('Python executable path:', pythonPath)
     console.log('Script path:', scriptPath)
     console.log('Temp directory:', tempDir)
