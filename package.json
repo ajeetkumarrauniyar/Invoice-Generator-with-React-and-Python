@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start -p ${PORT:-10000}",
+    "lint": "next lint"
   },
   "dependencies": {
     "@hookform/resolvers": "latest",
@@ -28,8 +29,13 @@
   },
   "devDependencies": {
     "autoprefixer": "^10.4.17",
+    "eslint": "9.19.0",
+    "eslint-config-next": "15.1.6",
     "postcss": "^8.5.1",
     "postcss-cli": "^11.0.0",
     "tailwindcss": "^3.4.1"
+  },
+  "engines": {
+    "node": ">=18.x"
   }
 }

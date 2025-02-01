@@ -5,11 +5,6 @@ import path from 'path'
 import fs from 'fs/promises'
 import os from 'os'
 
-export const config = {
-  runtime: 'edge',
-  regions: ['fra1'], // Choose the region closest to your users
-}
-
 export async function POST(request) {
   let partyDataPath = null;
   let pythonProcess = null;
