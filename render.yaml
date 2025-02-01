@@ -4,7 +4,6 @@ services:
     env: node
     buildCommand: |
       npm install
-      npm install -D autoprefixer postcss postcss-cli
       npm run build
       chmod +x scripts/*.py
       pip install -r requirements.txt
