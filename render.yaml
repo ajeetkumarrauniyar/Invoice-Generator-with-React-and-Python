@@ -5,6 +5,7 @@ services:
     buildCommand: |
       npm install
       npm run build
+      chmod +x scripts/*.py
       pip install -r requirements.txt
     startCommand: npm run start
     envVars:
