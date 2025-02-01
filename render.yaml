@@ -2,29 +2,22 @@ services:
   - type: web
     name: invoice-generator
     env: node
-    buildCommand: npm install && npm run build
+    buildCommand: |
+      npm install
+      npm run build
+      chmod +x scripts/*.py
+      pip install -r requirements.txt
     startCommand: npm run start
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: "10000"
+      - key: PYTHON_PATH
+        value: python3
     nodeVersion: 18.x
     healthCheckPath: /
     autoDeploy: true
     plan: free
     branch: main
-    runtime: node
-    envVars:
-      - key: PYTHON_PATH
-        value: python3
-      - key: NODE_ENV
-        value: production
-      - key: PORT
-        value: 10000
-    healthCheckPath: /
-    autoDeploy: true
-    plan: free
-    branch: main
-    runtime: node
-    nodeVersion: 18 
+    runtime: node 
