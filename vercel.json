@@ -1,0 +1,28 @@
+{
+  "functions": {
+    "app/api/generateInvoices/route.js": {
+      "runtime": "nodejs18.x",
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  },
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    },
+    {
+      "src": "scripts/generate_invoices.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/generateInvoices",
+      "dest": "/api/generateInvoices"
+    }
+  ],
+  "env": {
+    "PYTHON_PATH": "/var/lang/bin/python3"
+  }
+} 

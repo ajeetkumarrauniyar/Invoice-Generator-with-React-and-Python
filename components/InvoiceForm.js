@@ -119,22 +119,89 @@ export default function InvoiceForm() {
     try {
       setIsLoading(true)
       
+      // Validate dates
+      const startDate = new Date(data.startDate)
+      const endDate = new Date(data.endDate)
+      if (startDate > endDate) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Start date must be before end date"
+        })
+        return
+      }
+
+      // Validate rates
+      if (parseFloat(data.minPurchaseRate) > parseFloat(data.maxPurchaseRate)) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Minimum purchase rate must be less than maximum purchase rate"
+        })
+        return
+      }
+
+      // Validate margins
+      if (parseFloat(data.minMarginPercentage) > parseFloat(data.maxMarginPercentage)) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Minimum margin percentage must be less than maximum margin percentage"
+        })
+        return
+      }
+
+      // Validate party data format
+      const partyLines = data.partyData.trim().split('\n')
+      const validPartyData = partyLines.every(line => {
+        const [name, balance] = line.split(',').map(s => s.trim())
+        return name && !isNaN(balance) && parseFloat(balance) > 0
+      })
+
+      if (!validPartyData) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Invalid party data format. Each line should be in the format: 'Party Name, Balance' with positive balance"
+        })
+        return
+      }
+      
       const response = await axios.post('/api/generateInvoices', data, {
         responseType: 'blob',
+        timeout: 30000, // 30 second timeout
       })
 
       const contentType = response.headers['content-type']
       if (contentType && contentType.includes('application/json')) {
         const reader = new FileReader()
         reader.onload = () => {
-          const errorData = JSON.parse(reader.result)
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: errorData.message || 'An error occurred while generating invoices'
-          })
+          try {
+            const errorData = JSON.parse(reader.result)
+            toast({
+              variant: "destructive",
+              title: "Error",
+              description: errorData.message || 'An error occurred while generating invoices'
+            })
+          } catch (err) {
+            toast({
+              variant: "destructive",
+              title: "Error",
+              description: 'Failed to parse error response from server'
+            })
+          }
         }
         reader.readAsText(response.data)
+        return
+      }
+
+      // Validate that we received data
+      if (!response.data || response.data.size === 0) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "No data received from server"
+        })
         return
       }
 
@@ -145,6 +212,7 @@ export default function InvoiceForm() {
       document.body.appendChild(link)
       link.click()
       link.remove()
+      window.URL.revokeObjectURL(url) // Clean up the URL object
 
       toast({
         title: "Success",
@@ -152,10 +220,20 @@ export default function InvoiceForm() {
       })
     } catch (err) {
       console.error('Form submission error:', err)
+      let errorMessage = 'An error occurred while generating invoices'
+      
+      if (err.code === 'ECONNABORTED') {
+        errorMessage = 'Request timed out. Please try again.'
+      } else if (err.response) {
+        errorMessage = err.response.data?.message || 'Server error occurred'
+      } else if (err.request) {
+        errorMessage = 'Unable to reach the server. Please check your connection.'
+      }
+      
       toast({
         variant: "destructive",
         title: "Error",
-        description: err.response?.data?.message || 'An error occurred while generating invoices'
+        description: errorMessage
       })
     } finally {
       setIsLoading(false)

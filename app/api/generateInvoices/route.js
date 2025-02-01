@@ -2,9 +2,12 @@ import { NextResponse } from 'next/server'
 import { spawn } from 'child_process'
 import { writeFile, unlink } from 'fs/promises'
 import path from 'path'
+import fs from 'fs/promises'
+import os from 'os'
 
 export async function POST(request) {
   let partyDataPath = null;
+  let pythonProcess = null;
   
   try {
     const data = await request.json()
@@ -18,14 +21,30 @@ export async function POST(request) {
     }
 
     // Create a temporary file for the party data
-    partyDataPath = path.join(process.cwd(), 'temp_party_data.csv')
+    const tempDir = process.env.VERCEL ? '/tmp' : path.join(process.cwd(), 'temp')
+    try {
+      await fs.mkdir(tempDir, { recursive: true })
+    } catch (err) {
+      console.error('Failed to create temp directory:', err)
+    }
+    
+    partyDataPath = path.join(tempDir, `party_data_${Date.now()}.csv`)
     await writeFile(partyDataPath, data.partyData)
 
-    // Get the virtual environment Python path
-    const pythonPath = path.join(process.cwd(), 'venv', 'bin', 'python3')
+    // Get the Python executable path and script path
+    let pythonPath, scriptPath
+    
+    if (process.env.VERCEL) {
+      // In Vercel, we need to use the Python runtime from the Lambda environment
+      pythonPath = process.env.PYTHON_PATH || '/var/lang/bin/python3'
+      scriptPath = path.join('/var/task', 'scripts', 'generate_invoices.py')
+    } else {
+      // Local development
+      pythonPath = path.join(process.cwd(), 'venv', 'bin', 'python3')
+      scriptPath = path.join(process.cwd(), 'scripts', 'generate_invoices.py')
+    }
     
     // Prepare the Python script arguments
-    const scriptPath = path.join(process.cwd(), 'scripts', 'generate_invoices.py')
     const scriptArgs = [
       scriptPath,
       data.startDate,
@@ -39,28 +58,35 @@ export async function POST(request) {
       data.maxMarginPercentage || "2.65"
     ]
 
+    console.log('Environment:', process.env.NODE_ENV)
+    console.log('Is Vercel:', !!process.env.VERCEL)
+    console.log('Python executable path:', pythonPath)
+    console.log('Script path:', scriptPath)
+    console.log('Temp directory:', tempDir)
+    console.log('Party data path:', partyDataPath)
     console.log('Executing Python script with args:', scriptArgs)
 
     // Execute the Python script
-    const pythonProcess = spawn(pythonPath, scriptArgs)
+    pythonProcess = spawn(pythonPath, scriptArgs)
 
     return new Promise((resolve, reject) => {
       let outputData = []
       let errorData = []
 
       pythonProcess.stdout.on('data', (data) => {
+        console.log('Python stdout:', data.toString())
         outputData.push(data)
       })
 
       pythonProcess.stderr.on('data', (data) => {
-        console.error('Python script error:', data.toString())
+        console.error('Python stderr:', data.toString())
         errorData.push(data)
       })
 
       pythonProcess.on('error', (error) => {
         console.error('Failed to start Python process:', error)
         resolve(NextResponse.json(
-          { message: 'Failed to start Python process: ' + error.message },
+          { message: `Failed to start Python process: ${error.message}` },
           { status: 500 }
         ))
       })
@@ -79,14 +105,14 @@ export async function POST(request) {
           const errorMessage = Buffer.concat(errorData).toString()
           console.error('Python script exited with code:', code, 'Error:', errorMessage)
           resolve(NextResponse.json(
-            { message: 'Python script error: ' + errorMessage },
+            { message: `Python script error: ${errorMessage || 'Unknown error occurred'}` },
             { status: 500 }
           ))
         } else {
           const csvData = Buffer.concat(outputData)
           if (!csvData.length) {
             resolve(NextResponse.json(
-              { message: 'No data generated' },
+              { message: 'No data generated from Python script' },
               { status: 500 }
             ))
             return
@@ -103,16 +129,19 @@ export async function POST(request) {
     })
   } catch (error) {
     console.error('API route error:', error)
-    // Clean up the temporary file if it exists
+    // Clean up resources
     try {
+      if (pythonProcess) {
+        pythonProcess.kill()
+      }
       if (partyDataPath) {
         await unlink(partyDataPath)
       }
     } catch (err) {
-      console.error('Error cleaning up temp file:', err)
+      console.error('Error cleaning up resources:', err)
     }
     return NextResponse.json(
-      { message: 'Internal server error: ' + error.message },
+      { message: `Internal server error: ${error.message}` },
       { status: 500 }
     )
   }
