@@ -46,7 +46,6 @@ A modern, full-stack invoice generation application built with Next.js and Pytho
 
 ### Backend
 - Python
-- FastAPI (for invoice generation logic)
 
 ## 📦 Prerequisites
 
@@ -60,7 +59,8 @@ Before you begin, ensure you have the following installed:
 
 1. Clone the repository:
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/ajeetkumarrauniyar/Invoice-Generator-with-React-and-Python
+
 cd invoice_generator
 ```
 
@@ -74,7 +74,8 @@ yarn install
 3. Set up Python virtual environment and install dependencies:
 ```bash
 python -m venv venv
-source venv/bin/activate  # On Windows use: venv\Scripts\activate
+source venv/bin/activate  # On Windows
+use: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
