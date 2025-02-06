@@ -12,8 +12,6 @@ export async function POST(request) {
   try {
     const data = await request.json();
 
-    console.log("Received request data:", JSON.stringify(data, null, 2));
-
     // Validate required fields
     if (
       !data.startDate ||

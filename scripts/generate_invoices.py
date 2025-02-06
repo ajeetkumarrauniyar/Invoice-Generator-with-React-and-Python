@@ -6,35 +6,57 @@ from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 import traceback
 
-# Indian business name components
-BUSINESS_TYPES = [
-    "TRADERS", "ENTERPRISES", "INDUSTRIES", "AGRO", "TRADING CO", 
-    "& SONS", "& COMPANY", "CORPORATION", "BUSINESS", "VENTURES"
-]
-
-COMMON_PREFIXES = [
-    "SHRI", "SRI", "JAI", "OM", "NEW", "ROYAL", "NATIONAL", "INDIAN",
-    "GOLDEN", "SUPREME"
-]
-
-INDIAN_SURNAMES = [
-    "KUMAR", "SINGH", "SHARMA", "VERMA", "GUPTA", "PATEL", "REDDY",
-    "SHAH", "MEHTA", "JAIN", "AGARWAL", "SINHA", "RAO", "MISHRA"
-]
-
-def generate_indian_business_name():
-    """Generate a realistic Indian business name."""
-    name_type = random.randint(1, 3)
+# def generate_indian_business_name():
+#     """Generate a realistic Indian business name."""
+#     business_types = [
+#         "TRADERS", "ENTERPRISES", "INDUSTRIES", "AGRO", "TRADING CO", 
+#         "& SONS", "& COMPANY", "CORPORATION", "BUSINESS", "VENTURES"
+#     ]
+     
+#     common_prefixes = [
+#         "SHRI", "SRI", "JAI", "OM", "NEW", "ROYAL", "NATIONAL", "INDIAN",
+#         "GOLDEN", "SUPREME"
+#     ] 
     
-    if name_type == 1:
-        # Format: PREFIX SURNAME BUSINESS_TYPE
-        return f"{random.choice(COMMON_PREFIXES)} {random.choice(INDIAN_SURNAMES)} {random.choice(BUSINESS_TYPES)}"
-    elif name_type == 2:
-        # Format: SURNAME BUSINESS_TYPE
-        return f"{random.choice(INDIAN_SURNAMES)} {random.choice(BUSINESS_TYPES)}"
-    else:
-        # Format: PREFIX BUSINESS_TYPE
-        return f"{random.choice(COMMON_PREFIXES)} {random.choice(BUSINESS_TYPES)}"
+#     indian_surnames = [
+#         "KUMAR", "SINGH", "SHARMA", "VERMA", "GUPTA", "PATEL", "REDDY",
+#         "SHAH", "MEHTA", "JAIN", "AGARWAL", "SINHA", "RAO", "MISHRA"
+#     ]
+
+#     name_type = random.randint(1, 3)
+    
+#     if name_type == 1:
+#         # Format: PREFIX SURNAME BUSINESS_TYPE
+#         return f"{random.choice(common_prefixes)} {random.choice(indian_surnames )} {random.choice(business_types)}"
+#     elif name_type == 2:
+#         # Format: SURNAME BUSINESS_TYPE
+#         return f"{random.choice(indian_surnames)} {random.choice(business_types)}"
+#     else:
+#         # Format: PREFIX BUSINESS_TYPE
+#         return f"{random.choice( common_prefixes)} {random.choice(business_types)}"
+
+def generate_bihar_farmer_name():
+    """Generate a realistic Bihar farmer name."""
+    first_names = [
+        'Harinder', 'Vinod', 'Ajay', 'Lalan', 'Madan', 'Manish', 'Ramesh', 
+        'Suresh', 'Dinesh', 'Rajesh', 'Sanjay', 'Naveen', 'Ashok', 'Vijay', 
+        'Ravi', 'Mukesh', 'Amit', 'Rahul', 'Santosh', 'Naresh'
+    ]
+    
+    last_names = [
+        'Sahu', 'Tiwari', 'Prasad', 'Jaiswal', 'Kumar', 'Singh', 'Yadav', 
+        'Mishra', 'Pandey', 'Verma', 'Gupta', 'Maurya', 'Patel', 'Dubey'
+    ]
+    
+    return f"{random.choice(first_names)} {random.choice(last_names)}"
+
+# def generate_indian_business_names(count=10):
+#     """Generate multiple Indian business names."""
+#     return [generate_indian_business_name() for _ in range(count)]
+
+def generate_bihar_farmer_names(count=10):
+    """Generate multiple Bihar farmer names."""
+    return [generate_bihar_farmer_name() for _ in range(count)]
 
 def generate_party_dataset(total_amount, party_limit):
     """Generate a dictionary of parties with balanced distribution of the total amount."""
@@ -54,7 +76,7 @@ def generate_party_dataset(total_amount, party_limit):
         for i in range(num_parties):
             # Generate unique business name
             while True:
-                party_name = generate_indian_business_name()
+                party_name = generate_bihar_farmer_name()
                 if party_name not in used_names:
                     used_names.add(party_name)
                     break

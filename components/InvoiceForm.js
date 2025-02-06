@@ -156,19 +156,19 @@ export default function InvoiceForm() {
   } = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      startDate: "2024-04-01",
-      endDate: "2024-12-31",
-      startInvoiceNumber: "1001",
+      startDate: "",
+      endDate: "",
+      startInvoiceNumber: "",
       minPurchaseRate: "22.00",
       maxPurchaseRate: "23.00",
       minMarginPercentage: "2.25",
       maxMarginPercentage: "2.65",
       productName: "Paddy",
       useFileUpload: false,
-      dataEntryMode: "generate",
+      dataEntryMode: "manual",
       generateParties: true,
-      totalAmount: "1000000.00",
-      partyLimit: "200000.00",
+      totalAmount: "",
+      partyLimit: "",
     },
   });
 
@@ -520,7 +520,7 @@ export default function InvoiceForm() {
           <div className="space-y-4">
             <Label className="text-sm font-medium">Data Entry Mode</Label>
             <RadioGroup
-              defaultValue="generate"
+              defaultValue="manual"
               className="grid grid-cols-2 gap-4"
               {...register("dataEntryMode")}
               onValueChange={(value) =>
