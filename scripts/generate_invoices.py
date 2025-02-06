@@ -6,6 +6,71 @@ from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 import traceback
 
+# Indian business name components
+BUSINESS_TYPES = [
+    "TRADERS", "ENTERPRISES", "INDUSTRIES", "AGRO", "TRADING CO", 
+    "& SONS", "& COMPANY", "CORPORATION", "BUSINESS", "VENTURES"
+]
+
+COMMON_PREFIXES = [
+    "SHRI", "SRI", "JAI", "OM", "NEW", "ROYAL", "NATIONAL", "INDIAN",
+    "GOLDEN", "SUPREME"
+]
+
+INDIAN_SURNAMES = [
+    "KUMAR", "SINGH", "SHARMA", "VERMA", "GUPTA", "PATEL", "REDDY",
+    "SHAH", "MEHTA", "JAIN", "AGARWAL", "SINHA", "RAO", "MISHRA"
+]
+
+def generate_indian_business_name():
+    """Generate a realistic Indian business name."""
+    name_type = random.randint(1, 3)
+    
+    if name_type == 1:
+        # Format: PREFIX SURNAME BUSINESS_TYPE
+        return f"{random.choice(COMMON_PREFIXES)} {random.choice(INDIAN_SURNAMES)} {random.choice(BUSINESS_TYPES)}"
+    elif name_type == 2:
+        # Format: SURNAME BUSINESS_TYPE
+        return f"{random.choice(INDIAN_SURNAMES)} {random.choice(BUSINESS_TYPES)}"
+    else:
+        # Format: PREFIX BUSINESS_TYPE
+        return f"{random.choice(COMMON_PREFIXES)} {random.choice(BUSINESS_TYPES)}"
+
+def generate_party_dataset(total_amount, party_limit):
+    """Generate a dictionary of parties with balanced distribution of the total amount."""
+    try:
+        if total_amount <= 0 or party_limit <= 0:
+            raise ValueError("Total amount and party limit must be positive")
+            
+        if party_limit > total_amount:
+            raise ValueError("Party limit cannot be greater than total amount")
+            
+        num_parties = int((total_amount + party_limit - 1) // party_limit)# Round up division
+        
+        # Generate party names with realistic Indian business names
+        used_names = set()
+        party_data = {}
+
+        for i in range(num_parties):
+            # Generate unique business name
+            while True:
+                party_name = generate_indian_business_name()
+                if party_name not in used_names:
+                    used_names.add(party_name)
+                    break
+            
+            
+            # For the last party, adjust the balance to match total_amount exactly
+            if i == num_parties - 1:
+                remaining = total_amount - (party_limit * (num_parties - 1))
+                party_data[party_name] = float(remaining)
+            else:
+                party_data[party_name] = float(party_limit)
+                
+        return party_data
+    except Exception as e:
+        raise Exception(f"Error generating party dataset: {str(e)}")
+
 def format_rate(value):
     """Format rate to always show two decimal places."""
     return f"{float(value):.2f}"
@@ -14,7 +79,7 @@ def normalize_party_name(name):
     """Normalize the UNR- prefix in party names with robust handling of variations and ensure name is uppercase."""
     try:
         name = str(name).strip()
-        standard_prefix = "UNR- "
+        standard_prefix = "UNR-"
         
         # List of possible prefix variations (case-insensitive)
         prefix_variations = [
@@ -177,41 +242,61 @@ def generate_all_invoices(party_data, start_date, end_date, start_invoice_number
 
 def main():
     try:
-        if len(sys.argv) != 10:
-            raise ValueError(f"Incorrect number of arguments. Expected 10, got {len(sys.argv)}")
+        # Check if we're using the party data file or generating new data
+        if len(sys.argv) == 12 and sys.argv[4] == "--generate":
+            # Auto-generate mode
+            start_date = sys.argv[1]
+            end_date = sys.argv[2]
+            start_invoice_number = sys.argv[3]
+            total_amount = float(sys.argv[5])
+            party_limit = float(sys.argv[6])
+            product_name = sys.argv[7]
+            min_rate = float(sys.argv[8])
+            max_rate = float(sys.argv[9])
+            min_margin = float(sys.argv[10])
+            max_margin = float(sys.argv[11])
+            
+            # Generate party data
+            party_data = generate_party_dataset(total_amount, party_limit)
 
-        start_date = sys.argv[1]
-        end_date = sys.argv[2]
-        start_invoice_number = sys.argv[3]
-        party_data_file = sys.argv[4]
-        product_name = sys.argv[5]
-        min_rate = float(sys.argv[6])
-        max_rate = float(sys.argv[7])
-        min_margin = float(sys.argv[8])
-        max_margin = float(sys.argv[9])
+        elif len(sys.argv) == 10:
+            # Manual party data file mode
+            start_date = sys.argv[1]
+            end_date = sys.argv[2]
+            start_invoice_number = sys.argv[3]
+            party_data_file = sys.argv[4]
+            product_name = sys.argv[5]
+            min_rate = float(sys.argv[6])
+            max_rate = float(sys.argv[7])
+            min_margin = float(sys.argv[8])
+            max_margin = float(sys.argv[9])    
 
-        # Read party data from CSV
-        party_data = {}
-        try:
-            with open(party_data_file, 'r') as f:
-                for line_number, line in enumerate(f, 1):
-                    try:
-                        if ',' in line:
-                            name, balance = line.strip().split(',')
-                            name = name.strip()
-                            balance = float(balance.strip())
-                            if balance <= 0:
-                                print(f"Warning: Skipping line {line_number}, balance must be positive: {line.strip()}", file=sys.stderr)
-                                continue
-                            party_data[name] = balance
-                    except ValueError as e:
-                        print(f"Warning: Skipping invalid line {line_number}: {line.strip()}", file=sys.stderr)
-                        continue
-        except Exception as e:
-            raise Exception(f"Error reading party data file: {str(e)}")
+            # Read party data from CSV
+            party_data = {}
+            try:
+                with open(party_data_file, 'r') as f:
+                    for line_number, line in enumerate(f, 1):
+                        try:
+                            if ',' in line:
+                                name, balance = line.strip().split(',')
+                                name = name.strip()
+                                balance = float(balance.strip())
+                                if balance <= 0:
+                                    print(f"Warning: Skipping line {line_number}, balance must be positive: {line.strip()}", file=sys.stderr)
+                                    continue
+                                party_data[name] = balance
+                        except ValueError as e:
+                            print(f"Warning: Skipping invalid line {line_number}: {line.strip()}", file=sys.stderr)
+                            continue
+            except Exception as e:
+                raise Exception(f"Error reading party data file: {str(e)}")
 
-        if not party_data:
-            raise ValueError("No valid party data found in the input file")
+            if not party_data:
+                raise ValueError("No valid party data found in the input file")
+        else:
+            raise ValueError("Invalid number of arguments. Use either:\n" +
+                           "1. Auto-generate mode: 11 arguments (with --generate)\n" +
+                           "2. Manual file mode: 9 arguments (with party data file)")
 
         # Generate invoices
         df = generate_all_invoices(

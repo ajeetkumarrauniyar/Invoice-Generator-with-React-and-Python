@@ -1,210 +1,266 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import * as z from 'zod'
-import axios from 'axios'
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import axios from "axios";
 
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
-import { useToast } from "@/hooks/use-toast"
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 
-const formSchema = z.object({
-  startDate: z.string().min(1, 'Start date is required'),
-  endDate: z.string().min(1, 'End date is required'),
-  startInvoiceNumber: z.string()
-    .min(1, 'Starting invoice number is required')
-    .transform(val => parseInt(val))
-    .refine(val => !isNaN(val) && val > 0, 'Must be a positive number'),
-  productName: z.string().min(1, 'Product name is required'),
-  partyData: z.string().min(1, 'Party data is required').refine(
+const baseSchema = {
+  startDate: z.string().min(1, "Start date is required"),
+  endDate: z.string().min(1, "End date is required"),
+  startInvoiceNumber: z
+    .string()
+    .min(1, "Starting invoice number is required")
+    .transform((val) => parseInt(val))
+    .refine((val) => !isNaN(val) && val > 0, "Must be a positive number"),
+  productName: z.string().min(1, "Product name is required"),
+  minPurchaseRate: z
+    .string()
+    .transform((val) => parseFloat(val))
+    .refine((val) => !isNaN(val) && val > 0, "Must be a positive number"),
+  maxPurchaseRate: z
+    .string()
+    .transform((val) => parseFloat(val))
+    .refine((val) => !isNaN(val) && val > 0, "Must be a positive number"),
+  minMarginPercentage: z
+    .string()
+    .transform((val) => parseFloat(val))
+    .refine((val) => !isNaN(val) && val >= 0, "Must be a non-negative number"),
+  maxMarginPercentage: z
+    .string()
+    .transform((val) => parseFloat(val))
+    .refine((val) => !isNaN(val) && val >= 0, "Must be a non-negative number"),
+  dataEntryMode: z.enum(["manual", "generate"]),
+};
+
+const manualSchema = z.object({
+  ...baseSchema,
+  dataEntryMode: z.literal("manual"),
+  partyData: z
+    .string()
+    .min(1, "Party data is required")
+    .refine(
+      (data) => {
+        const lines = data.trim().split("\n");
+        return lines.every((line) => {
+          const parts = line.split(",");
+          return parts.length === 2 && !isNaN(parseFloat(parts[1]));
+        });
+      },
+      {
+        message:
+          'Invalid party data format. Each line should be "Party Name, Balance"',
+      }
+    ),
+  useFileUpload: z.boolean().optional(),
+});
+
+const generateSchema = z.object({
+  ...baseSchema,
+  dataEntryMode: z.literal("generate"),
+  generateParties: z.boolean(),
+  totalAmount: z
+    .string()
+    .min(1, "Total amount is required")
+    .transform((val) => parseFloat(val))
+    .refine((val) => !isNaN(val) && val > 0, "Must be a positive number"),
+  partyLimit: z
+    .string()
+    .min(1, "Per-party limit is required")
+    .transform((val) => parseFloat(val))
+    .refine((val) => !isNaN(val) && val > 0, "Must be a positive number"),
+});
+
+const formSchema = z
+  .discriminatedUnion("dataEntryMode", [manualSchema, generateSchema])
+  // Validate dates
+  .refine(
     (data) => {
-      const lines = data.trim().split('\n')
-      return lines.every(line => {
-        const parts = line.split(',')
-        return parts.length === 2 && !isNaN(parseFloat(parts[1]))
-      })
+      const start = new Date(data.startDate);
+      const end = new Date(data.endDate);
+      return start <= end;
     },
     {
-      message: 'Invalid party data format. Each line should be "Party Name, Balance"'
+      message: "End date must be after start date",
+      path: ["endDate"],
     }
-  ),
-  minPurchaseRate: z.string()
-    .transform(val => parseFloat(val))
-    .refine(val => !isNaN(val) && val > 0, 'Must be a positive number'),
-  maxPurchaseRate: z.string()
-    .transform(val => parseFloat(val))
-    .refine(val => !isNaN(val) && val > 0, 'Must be a positive number'),
-  minMarginPercentage: z.string()
-    .transform(val => parseFloat(val))
-    .refine(val => !isNaN(val) && val >= 0, 'Must be a non-negative number'),
-  maxMarginPercentage: z.string()
-    .transform(val => parseFloat(val))
-    .refine(val => !isNaN(val) && val >= 0, 'Must be a non-negative number'),
-  useFileUpload: z.boolean().optional()
-}).refine(
-  (data) => {
-    const start = new Date(data.startDate)
-    const end = new Date(data.endDate)
-    return start <= end
-  },
-  {
-    message: "End date must be after start date",
-    path: ["endDate"]
-  }
-).refine(
-  (data) => {
-    return parseFloat(data.minPurchaseRate) <= parseFloat(data.maxPurchaseRate)
-  },
-  {
-    message: "Maximum purchase rate must be greater than minimum purchase rate",
-    path: ["maxPurchaseRate"]
-  }
-).refine(
-  (data) => {
-    return parseFloat(data.minMarginPercentage) <= parseFloat(data.maxMarginPercentage)
-  },
-  {
-    message: "Maximum margin percentage must be greater than minimum margin percentage",
-    path: ["maxMarginPercentage"]
-  }
-)
+  )
+  // Validate rates
+  .refine(
+    (data) => {
+      return (
+        parseFloat(data.minPurchaseRate) <= parseFloat(data.maxPurchaseRate)
+      );
+    },
+    {
+      message:
+        "Maximum purchase rate must be greater than minimum purchase rate",
+      path: ["maxPurchaseRate"],
+    }
+  )
+  // Validate margins
+  .refine(
+    (data) => {
+      return (
+        parseFloat(data.minMarginPercentage) <=
+        parseFloat(data.maxMarginPercentage)
+      );
+    },
+    {
+      message:
+        "Maximum margin percentage must be greater than minimum margin percentage",
+      path: ["maxMarginPercentage"],
+    }
+  )
+  // Validate Party limit
+  .refine(
+    (data) => {
+      if (data.dataEntryMode === "generate") {
+        return parseFloat(data.partyLimit) <= parseFloat(data.totalAmount);
+      }
+      return true;
+    },
+    {
+      message: "Party limit cannot be greater than total amount",
+      path: ["partyLimit"],
+    }
+  );
 
 export default function InvoiceForm() {
-  const [isLoading, setIsLoading] = useState(false)
-  const [useFileUpload, setUseFileUpload] = useState(false)
-  const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState(false);
+  const [useFileUpload, setUseFileUpload] = useState(false);
+  const { toast } = useToast();
 
   const {
     register,
     handleSubmit,
     formState: { errors },
+    watch,
+    setValue,
   } = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      minPurchaseRate: '22.00',
-      maxPurchaseRate: '23.00',
-      minMarginPercentage: '2.25',
-      maxMarginPercentage: '2.65',
-      productName: 'Paddy',
-      useFileUpload: false
-    }
-  })
+      startDate: "2024-04-01",
+      endDate: "2024-12-31",
+      startInvoiceNumber: "1001",
+      minPurchaseRate: "22.00",
+      maxPurchaseRate: "23.00",
+      minMarginPercentage: "2.25",
+      maxMarginPercentage: "2.65",
+      productName: "Paddy",
+      useFileUpload: false,
+      dataEntryMode: "generate",
+      generateParties: true,
+      totalAmount: "1000000.00",
+      partyLimit: "200000.00",
+    },
+  });
 
   const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0]
+    const file = e.target.files?.[0];
     if (file) {
       try {
-        const text = await file.text()
-        const textarea = document.querySelector('textarea[name="partyData"]')
-        if (textarea) {
-          textarea.value = text
-          textarea.dispatchEvent(new Event('input', { bubbles: true }))
-        }
+        const text = await file.text();
+        setValue("partyData", text, { shouldValidate: true });
       } catch (err) {
         toast({
           variant: "destructive",
           title: "Error",
-          description: 'Failed to read file: ' + err.message
-        })
+          description: "Failed to read file: " + err.message,
+        });
       }
     }
-  }
+  };
 
   const onSubmit = async (data) => {
     try {
-      setIsLoading(true)
-      
-      // Validate dates
-      const startDate = new Date(data.startDate)
-      const endDate = new Date(data.endDate)
-      if (startDate > endDate) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Start date must be before end date"
-        })
-        return
-      }
+      setIsLoading(true);
 
-      // Validate rates
-      if (parseFloat(data.minPurchaseRate) > parseFloat(data.maxPurchaseRate)) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Minimum purchase rate must be less than maximum purchase rate"
-        })
-        return
-      }
+      const requestData = {
+        ...data,
+        generateParties: true,
+        partyData: data.dataEntryMode === "generate" ? [] : data.partyData,
+      };
 
-      // Validate margins
-      if (parseFloat(data.minMarginPercentage) > parseFloat(data.maxMarginPercentage)) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Minimum margin percentage must be less than maximum margin percentage"
-        })
-        return
+      if (requestData.generateParties === false && !requestData.partyData) {
+        console.error("partyData is required when generateParties is false");
       }
 
       // Validate party data format
-      const partyLines = data.partyData.trim().split('\n')
-      const validPartyData = partyLines.every(line => {
-        const [name, balance] = line.split(',').map(s => s.trim())
-        return name && !isNaN(balance) && parseFloat(balance) > 0
-      })
+      const partyLines = data.partyData
+        ? data.partyData.trim().split("\n")
+        : [];
+      const validPartyData = partyLines.every((line) => {
+        const [name, balance] = line.split(",").map((s) => s.trim());
+        return name && !isNaN(balance) && parseFloat(balance) > 0;
+      });
 
       if (!validPartyData) {
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Invalid party data format. Each line should be in the format: 'Party Name, Balance' with positive balance"
-        })
-        return
+          description:
+            "Invalid party data format. Each line should be in the format: 'Party Name, Balance' with positive balance",
+        });
+        return;
       }
-      
-      const response = await axios.post('/api/generateInvoices', data, {
-        responseType: 'blob',
+
+      const response = await axios.post("/api/generateInvoices", data, {
+        responseType: "blob",
         timeout: 30000, // 30 second timeout
         headers: {
-          'Content-Type': 'application/json'
-        }
-      })
+          "Content-Type": "application/json",
+        },
+      });
 
-      const contentType = response.headers['content-type']
-      if (contentType && contentType.includes('application/json')) {
-        const reader = new FileReader()
+      const contentType = response.headers["content-type"];
+      if (contentType && contentType.includes("application/json")) {
+        const reader = new FileReader();
         reader.onload = () => {
           try {
-            const errorData = JSON.parse(reader.result)
+            const errorData = JSON.parse(reader.result);
             toast({
               variant: "destructive",
               title: "Error",
-              description: errorData.message || 'An error occurred while generating invoices'
-            })
+              description:
+                errorData.message ||
+                "An error occurred while generating invoices",
+            });
           } catch (err) {
-            console.error('Error parsing error response:', err)
+            console.error("Error parsing error response:", err);
             toast({
               variant: "destructive",
               title: "Error",
-              description: 'Failed to parse error response from server'
-            })
+              description: "Failed to parse error response from server",
+            });
           }
-        }
+        };
         reader.onerror = () => {
-          console.error('Error reading error response:', reader.error)
+          console.error("Error reading error response:", reader.error);
           toast({
             variant: "destructive",
             title: "Error",
-            description: 'Failed to read error response from server'
-          })
-        }
-        reader.readAsText(response.data)
-        return
+            description: "Failed to read error response from server",
+          });
+        };
+        reader.readAsText(response.data);
+        return;
       }
 
       // Validate that we received data
@@ -212,256 +268,370 @@ export default function InvoiceForm() {
         toast({
           variant: "destructive",
           title: "Error",
-          description: "No data received from server"
-        })
-        return
+          description: "No data received from server",
+        });
+        return;
       }
 
-      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }))
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute('download', 'invoices.csv')
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(url) // Clean up the URL object
+      const url = window.URL.createObjectURL(
+        new Blob([response.data], { type: "text/csv" })
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "invoices.csv");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url); // Clean up the URL object
 
       toast({
         title: "Success",
-        description: "Invoices generated successfully"
-      })
+        description: "Invoices generated successfully",
+      });
     } catch (err) {
-      console.error('Form submission error:', err)
-      let errorMessage = 'An error occurred while generating invoices'
-      
-      if (err.code === 'ECONNABORTED') {
-        errorMessage = 'Request timed out. Please try again.'
+      console.error("Form submission error:", err);
+      let errorMessage = "An error occurred while generating invoices";
+
+      if (err.code === "ECONNABORTED") {
+        errorMessage = "Request timed out. Please try again.";
       } else if (err.response) {
         // Try to read the error message from the blob response
         try {
-          const reader = new FileReader()
+          const reader = new FileReader();
           reader.onload = () => {
             try {
-              const errorData = JSON.parse(reader.result)
+              const errorData = JSON.parse(reader.result);
               toast({
                 variant: "destructive",
                 title: "Error",
-                description: errorData.message || 'Server error occurred'
-              })
+                description: errorData.message || "Server error occurred",
+              });
             } catch (parseErr) {
-              console.error('Error parsing error response:', parseErr)
+              console.error("Error parsing error response:", parseErr);
               toast({
                 variant: "destructive",
                 title: "Error",
-                description: 'Server error occurred'
-              })
+                description: "Server error occurred",
+              });
             }
-          }
+          };
           reader.onerror = () => {
-            console.error('Error reading error response:', reader.error)
+            console.error("Error reading error response:", reader.error);
             toast({
               variant: "destructive",
               title: "Error",
-              description: 'Server error occurred'
-            })
-          }
-          reader.readAsText(err.response.data)
+              description: "Server error occurred",
+            });
+          };
+          reader.readAsText(err.response.data);
         } catch (blobErr) {
-          console.error('Error handling blob response:', blobErr)
+          console.error("Error handling blob response:", blobErr);
           toast({
             variant: "destructive",
             title: "Error",
-            description: err.response.data?.message || 'Server error occurred'
-          })
+            description: err.response.data?.message || "Server error occurred",
+          });
         }
       } else if (err.request) {
-        errorMessage = 'Unable to reach the server. Please check your connection.'
+        errorMessage =
+          "Unable to reach the server. Please check your connection.";
         toast({
           variant: "destructive",
           title: "Error",
-          description: errorMessage
-        })
+          description: errorMessage,
+        });
       } else {
         toast({
           variant: "destructive",
           title: "Error",
-          description: errorMessage
-        })
+          description: errorMessage,
+        });
       }
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <Card className="w-full max-w-4xl mx-auto shadow-lg">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold tracking-tight">Generate Invoices</CardTitle>
+        <CardTitle className="text-2xl font-bold tracking-tight">
+          Generate Invoices
+        </CardTitle>
         <CardDescription className="text-base text-gray-500">
-          Fill in the details below to generate invoices with customized parameters.
+          Fill in the details below to generate invoices with customized
+          parameters.
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
         <CardContent className="space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2.5">
-              <Label className="text-sm font-medium" htmlFor="startDate">Invoice Start Date</Label>
+              <Label className="text-sm font-medium" htmlFor="startDate">
+                Invoice Start Date
+              </Label>
               <Input
                 id="startDate"
                 type="date"
                 className="font-medium"
-                {...register('startDate')}
+                {...register("startDate")}
               />
               {errors.startDate && (
-                <p className="text-sm font-medium text-destructive mt-1.5">{errors.startDate.message}</p>
+                <p className="text-sm font-medium text-destructive mt-1.5">
+                  {errors.startDate.message}
+                </p>
               )}
             </div>
 
             <div className="space-y-2.5">
-              <Label className="text-sm font-medium" htmlFor="endDate">Invoice End Date</Label>
+              <Label className="text-sm font-medium" htmlFor="endDate">
+                Invoice End Date
+              </Label>
               <Input
                 id="endDate"
                 type="date"
                 className="font-medium"
-                {...register('endDate')}
+                {...register("endDate")}
               />
               {errors.endDate && (
-                <p className="text-sm font-medium text-destructive mt-1.5">{errors.endDate.message}</p>
+                <p className="text-sm font-medium text-destructive mt-1.5">
+                  {errors.endDate.message}
+                </p>
               )}
             </div>
 
             <div className="space-y-2.5">
-              <Label className="text-sm font-medium" htmlFor="startInvoiceNumber">Starting Invoice Number</Label>
+              <Label
+                className="text-sm font-medium"
+                htmlFor="startInvoiceNumber"
+              >
+                Starting Invoice Number
+              </Label>
               <Input
                 id="startInvoiceNumber"
                 type="number"
                 placeholder="e.g., 1001"
                 className="font-medium"
-                {...register('startInvoiceNumber')}
+                {...register("startInvoiceNumber")}
               />
               {errors.startInvoiceNumber && (
-                <p className="text-sm font-medium text-destructive mt-1.5">{errors.startInvoiceNumber.message}</p>
+                <p className="text-sm font-medium text-destructive mt-1.5">
+                  {errors.startInvoiceNumber.message}
+                </p>
               )}
             </div>
 
             <div className="space-y-2.5">
-              <Label className="text-sm font-medium" htmlFor="productName">Product Name</Label>
+              <Label className="text-sm font-medium" htmlFor="productName">
+                Product Name
+              </Label>
               <Input
                 id="productName"
                 type="text"
                 className="font-medium"
-                {...register('productName')}
+                {...register("productName")}
               />
               {errors.productName && (
-                <p className="text-sm font-medium text-destructive mt-1.5">{errors.productName.message}</p>
+                <p className="text-sm font-medium text-destructive mt-1.5">
+                  {errors.productName.message}
+                </p>
               )}
             </div>
 
             <div className="space-y-2.5">
-              <Label className="text-sm font-medium" htmlFor="minPurchaseRate">Minimum Purchase Rate (₹/kg)</Label>
+              <Label className="text-sm font-medium" htmlFor="minPurchaseRate">
+                Minimum Purchase Rate (₹/kg)
+              </Label>
               <Input
                 id="minPurchaseRate"
                 type="number"
                 step="0.01"
                 className="font-medium"
-                {...register('minPurchaseRate')}
+                {...register("minPurchaseRate")}
               />
               {errors.minPurchaseRate && (
-                <p className="text-sm font-medium text-destructive mt-1.5">{errors.minPurchaseRate.message}</p>
+                <p className="text-sm font-medium text-destructive mt-1.5">
+                  {errors.minPurchaseRate.message}
+                </p>
               )}
             </div>
 
             <div className="space-y-2.5">
-              <Label className="text-sm font-medium" htmlFor="maxPurchaseRate">Maximum Purchase Rate (₹/kg)</Label>
+              <Label className="text-sm font-medium" htmlFor="maxPurchaseRate">
+                Maximum Purchase Rate (₹/kg)
+              </Label>
               <Input
                 id="maxPurchaseRate"
                 type="number"
                 step="0.01"
                 className="font-medium"
-                {...register('maxPurchaseRate')}
+                {...register("maxPurchaseRate")}
               />
               {errors.maxPurchaseRate && (
-                <p className="text-sm font-medium text-destructive mt-1.5">{errors.maxPurchaseRate.message}</p>
+                <p className="text-sm font-medium text-destructive mt-1.5">
+                  {errors.maxPurchaseRate.message}
+                </p>
               )}
             </div>
 
             <div className="space-y-2.5">
-              <Label className="text-sm font-medium" htmlFor="minMarginPercentage">Minimum Margin Percentage (%)</Label>
+              <Label
+                className="text-sm font-medium"
+                htmlFor="minMarginPercentage"
+              >
+                Minimum Margin Percentage (%)
+              </Label>
               <Input
                 id="minMarginPercentage"
                 type="number"
                 step="0.01"
                 className="font-medium"
-                {...register('minMarginPercentage')}
+                {...register("minMarginPercentage")}
               />
               {errors.minMarginPercentage && (
-                <p className="text-sm font-medium text-destructive mt-1.5">{errors.minMarginPercentage.message}</p>
+                <p className="text-sm font-medium text-destructive mt-1.5">
+                  {errors.minMarginPercentage.message}
+                </p>
               )}
             </div>
 
             <div className="space-y-2.5">
-              <Label className="text-sm font-medium" htmlFor="maxMarginPercentage">Maximum Margin Percentage (%)</Label>
+              <Label
+                className="text-sm font-medium"
+                htmlFor="maxMarginPercentage"
+              >
+                Maximum Margin Percentage (%)
+              </Label>
               <Input
                 id="maxMarginPercentage"
                 type="number"
                 step="0.01"
                 className="font-medium"
-                {...register('maxMarginPercentage')}
+                {...register("maxMarginPercentage")}
               />
               {errors.maxMarginPercentage && (
-                <p className="text-sm font-medium text-destructive mt-1.5">{errors.maxMarginPercentage.message}</p>
+                <p className="text-sm font-medium text-destructive mt-1.5">
+                  {errors.maxMarginPercentage.message}
+                </p>
               )}
             </div>
           </div>
 
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium" htmlFor="partyData">Party Data</Label>
-              <div className="flex items-center space-x-3">
-                <label className="text-sm flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    className="rounded border-gray-300 text-primary focus:ring-primary"
-                    checked={useFileUpload}
-                    onChange={(e) => setUseFileUpload(e.target.checked)}
-                  />
-                  <span className="font-medium">Upload CSV file</span>
-                </label>
-                {useFileUpload && (
-                  <Input
-                    type="file"
-                    accept=".csv,text/csv"
-                    onChange={handleFileUpload}
-                    className="max-w-[200px] text-sm font-medium"
-                  />
+          <div className="space-y-4">
+            <Label className="text-sm font-medium">Data Entry Mode</Label>
+            <RadioGroup
+              defaultValue="generate"
+              className="grid grid-cols-2 gap-4"
+              {...register("dataEntryMode")}
+              onValueChange={(value) =>
+                setValue("dataEntryMode", value, { shouldValidate: true })
+              }
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="manual" id="manual" />
+                <Label htmlFor="manual">Manual Party Data Entry</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="generate" id="generate" />
+                <Label htmlFor="generate">Auto-Generate Party Data</Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          {watch("dataEntryMode") === "manual" ? (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium" htmlFor="partyData">
+                  Party Data
+                </Label>
+                <div className="flex items-center space-x-3">
+                  <label className="text-sm flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300 text-primary focus:ring-primary"
+                      checked={useFileUpload}
+                      onChange={(e) => setUseFileUpload(e.target.checked)}
+                    />
+                    <span className="font-medium">Upload CSV file</span>
+                  </label>
+                  {useFileUpload && (
+                    <Input
+                      type="file"
+                      accept=".csv,text/csv"
+                      onChange={handleFileUpload}
+                      className="max-w-[200px] text-sm font-medium"
+                    />
+                  )}
+                </div>
+              </div>
+              <div className="text-sm text-muted-foreground mb-2 font-medium">
+                Enter each party in a new line with format: "Party Name,
+                Balance"
+              </div>
+              <Textarea
+                id="partyData"
+                {...register("partyData")}
+                placeholder="UNR- ABHISHEK KUMAR, 300000.00&#10;UNR- CHANDAN SINGH, 300000.00"
+                className="font-mono text-sm min-h-[150px]"
+                rows={6}
+              />
+              {errors.partyData && (
+                <p className="text-sm font-medium text-destructive mt-1.5">
+                  {errors.partyData.message}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2.5">
+                <Label className="text-sm font-medium" htmlFor="totalAmount">
+                  Total Purchase Amount (₹)
+                </Label>
+                <Input
+                  id="totalAmount"
+                  type="number"
+                  step="0.01"
+                  placeholder="e.g., 1000000"
+                  className="font-medium"
+                  {...register("totalAmount")}
+                />
+                {errors.totalAmount && (
+                  <p className="text-sm font-medium text-destructive mt-1.5">
+                    {errors.totalAmount.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2.5">
+                <Label className="text-sm font-medium" htmlFor="partyLimit">
+                  Per-Party Limit (₹)
+                </Label>
+                <Input
+                  id="partyLimit"
+                  type="number"
+                  step="0.01"
+                  placeholder="e.g., 200000"
+                  className="font-medium"
+                  {...register("partyLimit")}
+                />
+                {errors.partyLimit && (
+                  <p className="text-sm font-medium text-destructive mt-1.5">
+                    {errors.partyLimit.message}
+                  </p>
                 )}
               </div>
             </div>
-            <div className="text-sm text-muted-foreground mb-2 font-medium">
-              Enter each party in a new line with format: "Party Name, Balance"
-            </div>
-            <Textarea
-              id="partyData"
-              {...register('partyData')}
-              placeholder="UNR- ABHISHEK KUMAR, 300000.00&#10;UNR- CHANDAN SINGH, 300000.00"
-              className="font-mono text-sm min-h-[150px]"
-              rows={6}
-            />
-            {errors.partyData && (
-              <p className="text-sm font-medium text-destructive mt-1.5">{errors.partyData.message}</p>
-            )}
-          </div>
+          )}
         </CardContent>
         <CardFooter>
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             className="w-full font-semibold text-base py-6"
             disabled={isLoading}
           >
-            {isLoading ? 'Generating...' : 'Generate Invoices'}
+            {isLoading ? "Generating..." : "Generate Invoices"}
           </Button>
         </CardFooter>
       </form>
     </Card>
-  )
-} 
+  );
+}
