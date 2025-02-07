@@ -1,51 +1,74 @@
 # Invoice Generator
 
-A modern, full-stack invoice generation application built with Next.js and Python. This application allows users to generate multiple invoices based on input parameters and export them as CSV files.
+A powerful and flexible invoice generation tool built with Next.js and Python. Designed for small businesses and wholesale traders, this application allows users to easily generate multiple invoices based on input parameters and export them as CSV files.
 
-## 🚀 Features
+🔗 **Live Link**: [Invoice Generator](https://invoice-generator-f1nn.onrender.com/)  
+📂 **Repo Link**: [GitHub Repository](https://github.com/ajeetkumarrauniyar/Invoice-Generator-with-React-and-Python/tree/v2.0.0)  
 
-### Invoice Generation
-- Generate multiple invoices simultaneously with customizable parameters
-- Support for various invoice formats and templates
-- Automatic invoice numbering with customizable prefixes
-- Configurable date formats and time zones
-- Line item management with automatic calculations
-- Tax rate configuration and automatic tax calculations
-- Support for multiple currencies
-- Customizable company branding and logos
+----
 
-### Data Management
-- Bulk invoice generation from CSV input
-- Export invoices to CSV format for easy integration
-- Save and load invoice templates
-- Client information management
-- Product/service catalog management
+## 🚀 Features  
 
-### User Interface
-- Modern React-based UI with ShadCN components
-- Intuitive form interface with real-time validation
-- Live preview of invoice changes
-- Toast notifications for operation feedback
-- Responsive design for all devices
-- Dark/Light mode support
+### ✅ **Optimized Invoice Generation**  
+- Prevents floating-point inaccuracies in tax and margin calculations.  
+- Ensures accurate invoice amounts and structured invoice formatting.
+- Generate multiple invoices simultaneously with customizable parameters.
+- Automatic invoice numbering with customizable prefixes, like UNR-, for consistency
 
-### Data Validation & Security
-- Real-time form validation
-- Input sanitization
-- Secure data handling
-- Error handling with detailed feedback
+### 🔄 **Flexible Data Input**  
+- Supports **predefined party data from a CSV file** or **auto-generates parties dynamically**.  
+- Eliminates the need for manually preparing party data.
 
-## 🛠️ Tech Stack
+### 🤖 **Auto-Generated Party Data**  
+- Users can generate parties automatically by providing **totalAmount** and **partyLimit**.  
+- If `generateParties` is enabled, the API directly generates party data, streamlining the process.  
 
-### Frontend
-- Next.js 14
-- React
-- TailwindCSS
-- ShadCN UI Components
-- React Hook Form
+### 📅 **Month-Based Sorting for Financial Year**  
+- Invoices are **sorted from April to March**, following the financial year, ensuring chronological organization and preventing errors caused by unordered records.
+- Invoices are sorted by month and invoice number, making financial tracking and auditing easier.
 
-### Backend
-- Python
+### 🛡️ **Enhanced Error Handling & Validation**  
+- **Zod-based validation** ensures data accuracy.
+- Real-time form validation to prevent errors during data entry.
+- Prevents **empty CSV downloads**, **invalid party limits**, and incorrect entries.
+- Input sanitization ensures clean data and secure handling.
+- Improves error tracking with better logging and debugging.  
+
+### 🔢 **Standardized Naming Convention**  
+- Invoice numbers follow a **structured format with prefixes like `UNR-`**, ensuring consistency.
+
+### 📊 **Efficient CSV Output**
+- Export invoices to **CSV format** for easy integration with external systems or record-keeping.
+- Organized output with invoices sorted by month and invoice number, enhancing financial record-keeping. 
+
+###🤖 **User Interface**
+- Modern React-based UI using ShadCN components for a sleek and responsive design.
+- Intuitive form interface with real-time validation for smooth user experience.
+- Toast notifications for real-time feedback during operations.
+- Responsive design for accessibility across all devices, from mobile to desktop.
+
+### 🔒 **Data Security**
+- Secure data handling ensures that sensitive information is well-protected.
+- Detailed error handling and real-time feedback for seamless operation.
+
+---  
+
+## 🏢 **Why is it Helpful for Businesses?**  
+This tool is designed to **simplify invoice generation** for small businesses, traders, and wholesalers dealing with **unregistered parties**. It:  
+✔️ **Saves Time** – No need to manually enter party details; supports auto-generation.  
+✔️ **Eliminates Errors** – Prevents floating-point inaccuracies and unordered invoice records.  
+✔️ **Ensures Compliance** – Generates structured and validated invoices.  
+✔️ **Organizes Financial Records** – Invoices are sorted in a proper financial-year format.  
+
+---
+
+## 🛠️ Tech Stack  
+- **Frontend**: Next.js, React, Tailwind CSS, ShadCn UI  
+- **Backend**: Python (FastAPI)  
+- **Validation**: Zod  
+- **State Management**: React Hook Form
+
+---
 
 ## 📦 Prerequisites
 
@@ -55,13 +78,13 @@ Before you begin, ensure you have the following installed:
 - npm or yarn
 - pip (Python package manager)
 
+---  
+
 ## 🔧 Installation
 
 1. Clone the repository:
 ```bash
 git clone https://github.com/ajeetkumarrauniyar/Invoice-Generator-with-React-and-Python
-
-cd invoice_generator
 ```
 
 2. Install frontend dependencies:
@@ -74,10 +97,11 @@ yarn install
 3. Set up Python virtual environment and install dependencies:
 ```bash
 python -m venv venv
-source venv/bin/activate  # On Windows
-use: venv\Scripts\activate
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
 pip install -r requirements.txt
 ```
+
+---
 
 ## 🚀 Running the Application
 
@@ -89,6 +113,8 @@ yarn dev
 ```
 
 2. The application will be available at `http://localhost:3000`
+
+---   
 
 ## 📁 Project Structure
 
@@ -105,12 +131,15 @@ invoice_generator/
 ├── scripts/              # Python scripts for invoice generation
 └── public/               # Static assets
 ```
+---
 
 ## 🔄 Development Workflow
 
 1. Make changes to the frontend code in the `app` and `components` directories
 2. Python scripts for invoice generation are located in the `scripts` directory
 3. API routes are handled in the `app/api` directory
+
+---
 
 ## 🧪 Testing
 
@@ -126,8 +155,10 @@ python -m pytest
 
 Create a `.env.local` file in the root directory with the following variables:
 ```
-NEXT_PUBLIC_API_URL=http://localhost:3000
+PYTHON_PATH=your_path
 ```
+
+---
 
 ## 🤝 Contributing
 
@@ -136,10 +167,17 @@ NEXT_PUBLIC_API_URL=http://localhost:3000
 3. Make your changes
 4. Submit a pull request
 
-## 📄 License
+---   
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+## 📜 License  
+This project is open-source and available for use under the MIT License. 
+
+---
 
 ## 👥 Support
 
 For support, please open an issue in the GitHub repository or contact the maintainers. 
+
+---  
+
+Start generating invoices effortlessly with [Invoice Generator](https://invoice-generator-f1nn.onrender.com/) today! 🚀
