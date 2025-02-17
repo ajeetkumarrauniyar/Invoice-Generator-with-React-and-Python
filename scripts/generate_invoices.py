@@ -199,21 +199,46 @@ class InvoiceGenerator:
 
             next_date = self.get_next_date()
 
-            max_possible = min(self.max_invoice, remaining_balance)
-            min_possible = max(self.min_invoice, Decimal("1"))
-
-            invoice_value = Decimal(
-                str(random.uniform(float(min_possible), float(max_possible)))
-            ).quantize(Decimal("1."), rounding=ROUND_HALF_UP)
-
+            # First generate a random rate
             rate = Decimal(
                 str(random.uniform(float(self.min_rate), float(self.max_rate)))
             ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-            
-            quantity = (invoice_value / rate).quantize(
+
+            # Calculate min and max possible quantities based on invoice constraints
+            min_quantity = (self.min_invoice / rate).quantize(Decimal("1."), rounding=ROUND_HALF_UP)
+            max_quantity = (min(self.max_invoice, remaining_balance) / rate).quantize(
                 Decimal("1."), rounding=ROUND_HALF_UP
             )
-            
+
+            if min_quantity > max_quantity:
+                # Adjust rate if quantity constraints cannot be met
+                rate = Decimal(
+                    str(random.uniform(float(self.min_rate), float(self.max_rate)))
+                ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                min_quantity = (self.min_invoice / rate).quantize(Decimal("1."), rounding=ROUND_HALF_UP)
+                max_quantity = (min(self.max_invoice, remaining_balance) / rate).quantize(
+                    Decimal("1."), rounding=ROUND_HALF_UP
+                )
+
+            # Generate random quantity
+            quantity = Decimal(
+                str(random.uniform(float(min_quantity), float(max_quantity)))
+            ).quantize(Decimal("1."), rounding=ROUND_HALF_UP)
+
+            # Calculate invoice value and round to nearest hundred
+            invoice_value = (rate * quantity).quantize(
+                Decimal("100."), rounding=ROUND_HALF_UP
+            )
+
+            # Validate invoice value constraints
+            if invoice_value < self.min_invoice or invoice_value > self.max_invoice:
+                # Adjust quantity to meet invoice value constraints
+                quantity = (self.min_invoice / rate).quantize(Decimal("1."), rounding=ROUND_HALF_UP)
+                invoice_value = (rate * quantity).quantize(
+                    Decimal("100."), rounding=ROUND_HALF_UP
+                )
+
+            # Generate margin and sale rate
             margin_percentage = Decimal(
                 str(random.uniform(float(self.min_margin), float(self.max_margin)))
             ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -222,6 +247,7 @@ class InvoiceGenerator:
                 Decimal("0.01"), rounding=ROUND_HALF_UP
             )
 
+            # Generate invoice number
             invoice_month = next_date.strftime("%b").upper()
             invoice_no = f"{invoice_month}-{self.global_invoice_counter:03d}"
             self.global_invoice_counter += 1
@@ -386,4 +412,4 @@ def main():
         sys.exit(1)
 
 if __name__ == '__main__':
-    main() 
+    main()
