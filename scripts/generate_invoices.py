@@ -299,11 +299,11 @@ def generate_all_invoices(party_data, start_date, end_date, start_invoice_number
                         "Party Name": current_party["name"],
                         "Product": product_name,
                         "Quantity (kg)": int(invoice["quantity"]),
-                        "Pur. Rate (₹/kg)": format_rate(invoice["rate"]),
-                        "Invoice Value (₹)": float(invoice["invoice_value"]),
-                        "Sale Rate (₹/kg)": format_rate(invoice["sale_rate"]),
+                        "Pur. Rate (Rs./kg)": format_rate(invoice["rate"]),
+                        "Invoice Value (Rs.)": float(invoice["invoice_value"]),
+                        "Sale Rate (Rs./kg)": format_rate(invoice["sale_rate"]),
                         "Margin (%)": format_rate(invoice["margin_percentage"]),
-                        "Balance Remaining (₹)": float(invoice["remaining_balance"]),
+                        "Balance Remaining (Rs.)": float(invoice["remaining_balance"]),
                     }
                 )
 
