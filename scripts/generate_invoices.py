@@ -147,25 +147,57 @@ class InvoiceGenerator:
             if self.min_margin > self.max_margin:
                 raise ValueError("Minimum margin must be less than maximum margin")
                 
-            self.min_invoice = Decimal("20000")
-            self.max_invoice = Decimal("48000")
+            self.min_invoice = Decimal("20000") # Minimum invoice value
+            self.max_invoice = Decimal("48000") # Maximum invoice value
             self.global_invoice_counter = int(start_invoice_number)
             self.last_invoice_date = self.start_date
+            
+             # Initialize date ranges with weighted distribution
+            self.available_dates = []
+            current_date = self.start_date
+            while current_date <= self.end_date:
+                # Higher weights for mid-month dates, lower for month start/end
+                day_of_month = current_date.day
+                if 5 <= day_of_month <= 25:
+                    weight = random.randint(2, 5)  # More invoices in mid-month
+                else:
+                    weight = random.randint(1, 3)  # Fewer invoices at month edges
+                    
+                self.available_dates.extend([current_date] * weight)
+                current_date += timedelta(days=1)
+            
+             # Sort dates to maintain chronological order
+            self.available_dates.sort()
+            
         except ValueError as e:
             raise ValueError(f"Invalid input parameters: {str(e)}")
         except Exception as e:
             raise Exception(f"Error initializing InvoiceGenerator: {str(e)}")
+
+    def get_next_date(self):
+        """Get the next available date, ensuring chronological order."""
+        if not self.available_dates:
+            return self.last_invoice_date
+        
+        # Find all dates that are after the last invoice date
+        valid_dates = [d for d in self.available_dates if d >= self.last_invoice_date]
+        
+        if not valid_dates:
+            return self.last_invoice_date
+            
+        # Pick the earliest available date from valid dates
+        next_date = valid_dates[0]
+        self.available_dates.remove(next_date)
+        self.last_invoice_date = next_date
+        
+        return next_date
 
     def generate_invoice(self, remaining_balance):
         try:
             if remaining_balance < self.min_invoice:
                 return None
 
-            days_increment = random.randint(1, 10)
-            next_date = min(
-                self.last_invoice_date + timedelta(days=days_increment), self.end_date
-            )
-            self.last_invoice_date = next_date
+            next_date = self.get_next_date()
 
             max_possible = min(self.max_invoice, remaining_balance)
             min_possible = max(self.min_invoice, Decimal("1"))
