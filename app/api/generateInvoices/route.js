@@ -29,14 +29,22 @@ export async function POST(request) {
     if (
       isNaN(data.startInvoiceNumber) ||
       isNaN(data.minPurchaseRate) ||
-      isNaN(data.maxPurchaseRate) ||
-      isNaN(data.minMarginPercentage) ||
-      isNaN(data.maxMarginPercentage)
+      isNaN(data.maxPurchaseRate)
     ) {
       return NextResponse.json(
         { message: "Invalid numeric fields" },
         { status: 400 }
       );
+    }
+
+    // Only validate margin percentages if invoice type is purchase
+    if (data.invoiceType === "purchase") {
+      if (isNaN(data.minMarginPercentage) || isNaN(data.maxMarginPercentage)) {
+        return NextResponse.json(
+          { message: "Invalid margin percentage fields" },
+          { status: 400 }
+        );
+      }
     }
 
     // Only validate totalAmount and partyLimit if generating parties automatically
@@ -105,12 +113,13 @@ export async function POST(request) {
         data.startInvoiceNumber.toString(),
         "--generate",
         data.totalAmount.toString(),
-        data.partyLimit.toString(),
-        data.productName,
+        (data.partyLimit || 200000).toString(),
+        (data.productName || "WHOLE PADDY GRAINS"),
         (data.minPurchaseRate || 22).toString(),
         (data.maxPurchaseRate || 23).toString(),
-        (data.minMarginPercentage || 2.25).toString(),
-        (data.maxMarginPercentage || 2.65).toString(),
+        (data.minMarginPercentage || 0).toString(), // Default to 0 for sales
+        (data.maxMarginPercentage || 0).toString(), // Default to 0 for sales
+        data.invoiceType || "purchase", // Add invoice type parameter
       ];
     } else {
       // Original functionality with party data file
@@ -136,15 +145,17 @@ export async function POST(request) {
         scriptPath,
         data.startDate,
         data.endDate,
-        data.startInvoiceNumber.toString(),
+        (data.startInvoiceNumber || 1).toString(),
         partyDataPath,
-        data.productName,
+        (data.productName || "WHOLE PADDY GRAINS"),
         (data.minPurchaseRate || 22).toString(),
         (data.maxPurchaseRate || 23).toString(),
-        (data.minMarginPercentage || 2.25).toString(),
-        (data.maxMarginPercentage || 2.65).toString(),
+        (data.minMarginPercentage || 0).toString(), // Default to 0 for sales
+        (data.maxMarginPercentage || 0).toString(), // Default to 0 for sales
+        data.invoiceType || "purchase", // Add invoice type parameter
       ];
     }
+
     // Execute the Python script
     pythonProcess = spawn(pythonPath, scriptArgs);
 

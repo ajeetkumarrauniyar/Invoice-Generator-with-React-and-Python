@@ -127,7 +127,7 @@ def normalize_party_name(name):
         return name
 
 class InvoiceGenerator:
-    def __init__(self, start_date, end_date, start_invoice_number, min_rate, max_rate, min_margin, max_margin):
+    def __init__(self, start_date, end_date, start_invoice_number, min_rate, max_rate, min_margin, max_margin, invoice_type):
         try:
             self.start_date = datetime.strptime(start_date, '%Y-%m-%d')
             self.end_date = datetime.strptime(end_date, '%Y-%m-%d')
@@ -147,7 +147,7 @@ class InvoiceGenerator:
             if self.min_margin > self.max_margin:
                 raise ValueError("Minimum margin must be less than maximum margin")
                 
-            self.min_invoice = Decimal("20000") # Minimum invoice value
+            self.min_invoice = Decimal("15000") if invoice_type == "sales" else Decimal("20000") # Minimum invoice value
             self.max_invoice = Decimal("48000") # Maximum invoice value
             self.global_invoice_counter = int(start_invoice_number)
             self.last_invoice_date = self.start_date
@@ -266,9 +266,9 @@ class InvoiceGenerator:
             print(f"Error generating invoice: {str(e)}", file=sys.stderr)
             return None
 
-def generate_all_invoices(party_data, start_date, end_date, start_invoice_number, product_name, min_rate, max_rate, min_margin, max_margin):
+def generate_all_invoices(party_data, start_date, end_date, start_invoice_number, product_name, min_rate, max_rate, min_margin, max_margin, invoice_type):
     try:
-        generator = InvoiceGenerator(start_date, end_date, start_invoice_number, min_rate, max_rate, min_margin, max_margin)
+        generator = InvoiceGenerator(start_date, end_date, start_invoice_number, min_rate, max_rate, min_margin, max_margin, invoice_type)
         all_results = []
 
         active_parties = []
@@ -323,7 +323,7 @@ def generate_all_invoices(party_data, start_date, end_date, start_invoice_number
 def main():
     try:
         # Check if we're using the party data file or generating new data
-        if len(sys.argv) == 12 and sys.argv[4] == "--generate":
+        if len(sys.argv) in (12, 13) and sys.argv[4] == "--generate":
             # Auto-generate mode
             start_date = sys.argv[1]
             end_date = sys.argv[2]
@@ -335,11 +335,12 @@ def main():
             max_rate = float(sys.argv[9])
             min_margin = float(sys.argv[10])
             max_margin = float(sys.argv[11])
+            invoice_type = sys.argv[12] if len(sys.argv) == 13 else 'purchase'
             
             # Generate party data
             party_data = generate_party_dataset(total_amount, party_limit)
 
-        elif len(sys.argv) == 10:
+        elif len(sys.argv) in (10, 11):
             # Manual party data file mode
             start_date = sys.argv[1]
             end_date = sys.argv[2]
@@ -349,7 +350,8 @@ def main():
             min_rate = float(sys.argv[6])
             max_rate = float(sys.argv[7])
             min_margin = float(sys.argv[8])
-            max_margin = float(sys.argv[9])    
+            max_margin = float(sys.argv[9])
+            invoice_type = sys.argv[10] if len(sys.argv) == 11 else 'purchase'  
 
             # Read party data from CSV
             party_data = {}
@@ -377,7 +379,7 @@ def main():
             raise ValueError("Invalid number of arguments. Use either:\n" +
                            "1. Auto-generate mode: 11 arguments (with --generate)\n" +
                            "2. Manual file mode: 9 arguments (with party data file)")
-
+ 
         # Generate invoices
         df = generate_all_invoices(
             party_data,
@@ -388,7 +390,8 @@ def main():
             min_rate,
             max_rate,
             min_margin,
-            max_margin
+            max_margin,
+            invoice_type
         )
 
         # Sort by invoice number
