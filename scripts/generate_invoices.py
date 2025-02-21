@@ -127,7 +127,7 @@ def normalize_party_name(name):
         return name
 
 class InvoiceGenerator:
-    def __init__(self, start_date, end_date, start_invoice_number, min_rate, max_rate, min_margin, max_margin):
+    def __init__(self, start_date, end_date, start_invoice_number, min_rate, max_rate, min_margin, max_margin, invoice_type):
         try:
             self.start_date = datetime.strptime(start_date, '%Y-%m-%d')
             self.end_date = datetime.strptime(end_date, '%Y-%m-%d')
@@ -145,9 +145,10 @@ class InvoiceGenerator:
             self.max_margin = Decimal(str(max_margin))
             
             if self.min_margin > self.max_margin:
-                raise ValueError("Minimum margin must be less than maximum margin")
-                
-            self.min_invoice = Decimal("20000") # Minimum invoice value
+                raise ValueError("Minimum margin must be less than maximum margin")          
+            self.invoice_type = invoice_type  # Store invoice type (purchase or sales)
+    
+            self.min_invoice = Decimal("15000") if invoice_type == "sales" else Decimal("20000") # Minimum invoice value
             self.max_invoice = Decimal("48000") # Maximum invoice value
             self.global_invoice_counter = int(start_invoice_number)
             self.last_invoice_date = self.start_date
@@ -199,24 +200,40 @@ class InvoiceGenerator:
 
             next_date = self.get_next_date()
 
-            # First generate a random rate
+            # Generate purchase rate
             rate = Decimal(
                 str(random.uniform(float(self.min_rate), float(self.max_rate)))
             ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-            # Calculate min and max possible quantities based on invoice constraints
-            min_quantity = (self.min_invoice / rate).quantize(Decimal("1."), rounding=ROUND_HALF_UP)
-            max_quantity = (min(self.max_invoice, remaining_balance) / rate).quantize(
+            # Generate margin and calculate sale rate
+            margin_percentage = Decimal(
+                str(random.uniform(float(self.min_margin), float(self.max_margin)))
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            
+            sale_rate = (rate * (1 + margin_percentage / 100)).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+
+            # Use appropriate rate based on invoice type
+            calculation_rate = sale_rate if self.invoice_type == 'sales' else rate
+
+            # Calculate min and max quantities using the appropriate rate
+            min_quantity = (self.min_invoice / calculation_rate).quantize(Decimal("1."), rounding=ROUND_HALF_UP)
+            max_quantity = (min(self.max_invoice, remaining_balance) / calculation_rate).quantize(
                 Decimal("1."), rounding=ROUND_HALF_UP
             )
 
             if min_quantity > max_quantity:
-                # Adjust rate if quantity constraints cannot be met
+                # Recalculate rate and quantities if constraints cannot be met
                 rate = Decimal(
                     str(random.uniform(float(self.min_rate), float(self.max_rate)))
                 ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-                min_quantity = (self.min_invoice / rate).quantize(Decimal("1."), rounding=ROUND_HALF_UP)
-                max_quantity = (min(self.max_invoice, remaining_balance) / rate).quantize(
+                sale_rate = (rate * (1 + margin_percentage / 100)).quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                )
+                calculation_rate = sale_rate if self.invoice_type == 'sales' else rate
+                min_quantity = (self.min_invoice / calculation_rate).quantize(Decimal("1."), rounding=ROUND_HALF_UP)
+                max_quantity = (min(self.max_invoice, remaining_balance) / calculation_rate).quantize(
                     Decimal("1."), rounding=ROUND_HALF_UP
                 )
 
@@ -225,27 +242,17 @@ class InvoiceGenerator:
                 str(random.uniform(float(min_quantity), float(max_quantity)))
             ).quantize(Decimal("1."), rounding=ROUND_HALF_UP)
 
-            # Calculate invoice value and round to nearest hundred
-            invoice_value = (rate * quantity).quantize(
+            # Calculate invoice value using the appropriate rate
+            invoice_value = (calculation_rate * quantity).quantize(
                 Decimal("100."), rounding=ROUND_HALF_UP
             )
 
-            # Validate invoice value constraints
+            # Validate and adjust if needed
             if invoice_value < self.min_invoice or invoice_value > self.max_invoice:
-                # Adjust quantity to meet invoice value constraints
-                quantity = (self.min_invoice / rate).quantize(Decimal("1."), rounding=ROUND_HALF_UP)
-                invoice_value = (rate * quantity).quantize(
+                quantity = (self.min_invoice / calculation_rate).quantize(Decimal("1."), rounding=ROUND_HALF_UP)
+                invoice_value = (calculation_rate * quantity).quantize(
                     Decimal("100."), rounding=ROUND_HALF_UP
                 )
-
-            # Generate margin and sale rate
-            margin_percentage = Decimal(
-                str(random.uniform(float(self.min_margin), float(self.max_margin)))
-            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-            
-            sale_rate = (rate * (1 + margin_percentage / 100)).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP
-            )
 
             # Generate invoice number
             invoice_month = next_date.strftime("%b").upper()
@@ -266,9 +273,9 @@ class InvoiceGenerator:
             print(f"Error generating invoice: {str(e)}", file=sys.stderr)
             return None
 
-def generate_all_invoices(party_data, start_date, end_date, start_invoice_number, product_name, min_rate, max_rate, min_margin, max_margin):
+def generate_all_invoices(party_data, start_date, end_date, start_invoice_number, product_name, min_rate, max_rate, min_margin, max_margin, invoice_type):
     try:
-        generator = InvoiceGenerator(start_date, end_date, start_invoice_number, min_rate, max_rate, min_margin, max_margin)
+        generator = InvoiceGenerator(start_date, end_date, start_invoice_number, min_rate, max_rate, min_margin, max_margin, invoice_type)
         all_results = []
 
         active_parties = []
@@ -292,8 +299,19 @@ def generate_all_invoices(party_data, start_date, end_date, start_invoice_number
             invoice = generator.generate_invoice(current_party["remaining"])
 
             if invoice is not None:
-                all_results.append(
-                    {
+                if invoice_type == 'sales':
+                    all_results.append({
+                        "Invoice Date": invoice["date"].strftime("%d-%m-%Y"),
+                        "Invoice No": invoice["invoice_no"],
+                        "Party Name": current_party["name"],
+                        "Product": product_name,
+                        "Quantity (kg)": int(invoice["quantity"]),
+                        "Sale Rate (Rs./kg)": format_rate(invoice["sale_rate"]),
+                        "Invoice Value (Rs.)": float(invoice["invoice_value"]),
+                        "Flag": "Sale"
+                    })
+                else:
+                    all_results.append({
                         "Invoice Date": invoice["date"].strftime("%d-%m-%Y"),
                         "Invoice No": invoice["invoice_no"],
                         "Party Name": current_party["name"],
@@ -304,9 +322,8 @@ def generate_all_invoices(party_data, start_date, end_date, start_invoice_number
                         "Sale Rate (Rs./kg)": format_rate(invoice["sale_rate"]),
                         "Margin (%)": format_rate(invoice["margin_percentage"]),
                         "Balance Remaining (Rs.)": float(invoice["remaining_balance"]),
-                    }
-                )
-
+                    })
+                    
                 current_party["remaining"] = invoice["remaining_balance"]
 
                 if current_party["remaining"] >= generator.min_invoice:
@@ -323,7 +340,7 @@ def generate_all_invoices(party_data, start_date, end_date, start_invoice_number
 def main():
     try:
         # Check if we're using the party data file or generating new data
-        if len(sys.argv) == 12 and sys.argv[4] == "--generate":
+        if len(sys.argv) in (12, 13) and sys.argv[4] == "--generate":
             # Auto-generate mode
             start_date = sys.argv[1]
             end_date = sys.argv[2]
@@ -335,11 +352,12 @@ def main():
             max_rate = float(sys.argv[9])
             min_margin = float(sys.argv[10])
             max_margin = float(sys.argv[11])
+            invoice_type = sys.argv[12] if len(sys.argv) == 13 else 'purchase'
             
             # Generate party data
             party_data = generate_party_dataset(total_amount, party_limit)
 
-        elif len(sys.argv) == 10:
+        elif len(sys.argv) in (10, 11):
             # Manual party data file mode
             start_date = sys.argv[1]
             end_date = sys.argv[2]
@@ -349,7 +367,8 @@ def main():
             min_rate = float(sys.argv[6])
             max_rate = float(sys.argv[7])
             min_margin = float(sys.argv[8])
-            max_margin = float(sys.argv[9])    
+            max_margin = float(sys.argv[9])
+            invoice_type = sys.argv[10] if len(sys.argv) == 11 else 'purchase'  
 
             # Read party data from CSV
             party_data = {}
@@ -377,7 +396,7 @@ def main():
             raise ValueError("Invalid number of arguments. Use either:\n" +
                            "1. Auto-generate mode: 11 arguments (with --generate)\n" +
                            "2. Manual file mode: 9 arguments (with party data file)")
-
+ 
         # Generate invoices
         df = generate_all_invoices(
             party_data,
@@ -388,7 +407,8 @@ def main():
             min_rate,
             max_rate,
             min_margin,
-            max_margin
+            max_margin,
+            invoice_type
         )
 
         # Sort by invoice number

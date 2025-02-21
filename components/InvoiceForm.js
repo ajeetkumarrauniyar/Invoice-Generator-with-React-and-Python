@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 
@@ -47,6 +48,7 @@ const baseSchema = {
     .transform((val) => parseFloat(val))
     .refine((val) => !isNaN(val) && val >= 0, "Must be a non-negative number"),
   dataEntryMode: z.enum(["manual", "generate"]),
+  invoiceType: z.enum(["purchase", "sales"]).default("purchase"),
 };
 
 const manualSchema = z.object({
@@ -169,6 +171,7 @@ export default function InvoiceForm() {
       generateParties: true,
       totalAmount: "",
       partyLimit: "",
+      invoiceType: "purchase",
     },
   });
 
@@ -187,6 +190,8 @@ export default function InvoiceForm() {
       }
     }
   };
+
+  const invoiceType = watch("invoiceType");
 
   const onSubmit = async (data) => {
     try {
@@ -359,8 +364,36 @@ export default function InvoiceForm() {
           Generate Invoices
         </CardTitle>
         <CardDescription className="text-base text-gray-500">
-          Fill in the details below to generate invoices with customized
-          parameters.
+          <div className="flex items-center justify-between">
+            <span>
+              Fill in the details below to generate invoices with customized
+              parameters.
+            </span>
+            <div className="flex space-x-3">
+              <span
+                className={`text-md font-bold ${
+                  invoiceType === "purchase" ? "text-blue-500" : "text-gray-400"
+                }`}
+              >
+                Purchase
+              </span>
+              <Switch
+                checked={invoiceType === "sales"}
+                onCheckedChange={(checked) =>
+                  setValue("invoiceType", checked ? "sales" : "purchase", {
+                    shouldValidate: true,
+                  })
+                }
+              />
+              <span
+                className={`text-md font-bold ${
+                  invoiceType === "sales" ? "text-green-500" : "text-gray-400"
+                }`}
+              >
+                Sales
+              </span>
+            </div>
+          </div>
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
@@ -400,26 +433,31 @@ export default function InvoiceForm() {
               )}
             </div>
 
-            <div className="space-y-2.5">
-              <Label
-                className="text-sm font-medium"
-                htmlFor="startInvoiceNumber"
-              >
-                Starting Invoice Number
-              </Label>
-              <Input
-                id="startInvoiceNumber"
-                type="number"
-                placeholder="e.g., 1001"
-                className="font-medium"
-                {...register("startInvoiceNumber")}
-              />
-              {errors.startInvoiceNumber && (
-                <p className="text-sm font-medium text-destructive mt-1.5">
-                  {errors.startInvoiceNumber.message}
-                </p>
-              )}
-            </div>
+            {invoiceType === "purchase" ? (
+              <div className="space-y-2.5">
+                <Label
+                  className="text-sm font-medium"
+                  htmlFor="startInvoiceNumber"
+                >
+                  Starting Invoice Number
+                </Label>
+                <Input
+                  id="startInvoiceNumber"
+                  type="number"
+                  placeholder="e.g., 1001"
+                  className="font-medium"
+                  {...register("startInvoiceNumber")}
+                />
+                {errors.startInvoiceNumber && (
+                  <p className="text-sm font-medium text-destructive mt-1.5">
+                    {errors.startInvoiceNumber.message}
+                  </p>
+                )}
+              </div>
+            ) : (
+              // Empty div to maintain grid layout
+              <div className="hidden md:block" aria-hidden="true" />
+            )}
 
             <div className="space-y-2.5">
               <Label className="text-sm font-medium" htmlFor="productName">
@@ -440,7 +478,8 @@ export default function InvoiceForm() {
 
             <div className="space-y-2.5">
               <Label className="text-sm font-medium" htmlFor="minPurchaseRate">
-                Minimum Purchase Rate (₹/kg)
+                Minimum {invoiceType === "sales" ? "Sales" : "Purchase"} Rate
+                (₹/kg)
               </Label>
               <Input
                 id="minPurchaseRate"
@@ -458,7 +497,8 @@ export default function InvoiceForm() {
 
             <div className="space-y-2.5">
               <Label className="text-sm font-medium" htmlFor="maxPurchaseRate">
-                Maximum Purchase Rate (₹/kg)
+                Maximum {invoiceType === "sales" ? "Sales" : "Purchase"} Rate
+                (₹/kg)
               </Label>
               <Input
                 id="maxPurchaseRate"
@@ -473,48 +513,53 @@ export default function InvoiceForm() {
                 </p>
               )}
             </div>
+            {invoiceType === "purchase" && (
+              <>
+                <div className="space-y-2.5">
+                  <Label
+                    className="text-sm font-medium"
+                    htmlFor="minMarginPercentage"
+                  >
+                    Minimum Margin Percentage (%)
+                  </Label>
+                  <Input
+                    id="minMarginPercentage"
+                    type="number"
+                    step="0.01"
+                    defaultValue="2.25"
+                    className="font-medium"
+                    {...register("minMarginPercentage")}
+                  />
+                  {errors.minMarginPercentage && (
+                    <p className="text-sm font-medium text-destructive mt-1.5">
+                      {errors.minMarginPercentage.message}
+                    </p>
+                  )}
+                </div>
 
-            <div className="space-y-2.5">
-              <Label
-                className="text-sm font-medium"
-                htmlFor="minMarginPercentage"
-              >
-                Minimum Margin Percentage (%)
-              </Label>
-              <Input
-                id="minMarginPercentage"
-                type="number"
-                step="0.01"
-                className="font-medium"
-                {...register("minMarginPercentage")}
-              />
-              {errors.minMarginPercentage && (
-                <p className="text-sm font-medium text-destructive mt-1.5">
-                  {errors.minMarginPercentage.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2.5">
-              <Label
-                className="text-sm font-medium"
-                htmlFor="maxMarginPercentage"
-              >
-                Maximum Margin Percentage (%)
-              </Label>
-              <Input
-                id="maxMarginPercentage"
-                type="number"
-                step="0.01"
-                className="font-medium"
-                {...register("maxMarginPercentage")}
-              />
-              {errors.maxMarginPercentage && (
-                <p className="text-sm font-medium text-destructive mt-1.5">
-                  {errors.maxMarginPercentage.message}
-                </p>
-              )}
-            </div>
+                <div className="space-y-2.5">
+                  <Label
+                    className="text-sm font-medium"
+                    htmlFor="maxMarginPercentage"
+                  >
+                    Maximum Margin Percentage (%)
+                  </Label>
+                  <Input
+                    id="maxMarginPercentage"
+                    type="number"
+                    step="0.01"
+                    defaultValue="2.65"
+                    className="font-medium"
+                    {...register("maxMarginPercentage")}
+                  />
+                  {errors.maxMarginPercentage && (
+                    <p className="text-sm font-medium text-destructive mt-1.5">
+                      {errors.maxMarginPercentage.message}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           <div className="space-y-4">
@@ -585,13 +630,15 @@ export default function InvoiceForm() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2.5">
                 <Label className="text-sm font-medium" htmlFor="totalAmount">
-                  Total Purchase Amount (₹)
+                  Total {invoiceType === "sales" ? "Sales" : "Purchase"} Amount
+                  (₹)
                 </Label>
                 <Input
                   id="totalAmount"
                   type="number"
                   step="0.01"
-                  placeholder="e.g., 1000000"
+                  // placeholder="e.g., 1000000"
+                  defaultValue="3000000"
                   className="font-medium"
                   {...register("totalAmount")}
                 />
@@ -601,24 +648,27 @@ export default function InvoiceForm() {
                   </p>
                 )}
               </div>
-              <div className="space-y-2.5">
-                <Label className="text-sm font-medium" htmlFor="partyLimit">
-                  Per-Party Limit (₹)
-                </Label>
-                <Input
-                  id="partyLimit"
-                  type="number"
-                  step="0.01"
-                  placeholder="e.g., 200000"
-                  className="font-medium"
-                  {...register("partyLimit")}
-                />
-                {errors.partyLimit && (
-                  <p className="text-sm font-medium text-destructive mt-1.5">
-                    {errors.partyLimit.message}
-                  </p>
-                )}
-              </div>
+              {invoiceType === "purchase" && (
+                <div className="space-y-2.5">
+                  <Label className="text-sm font-medium" htmlFor="partyLimit">
+                    Per-Party Limit (₹)
+                  </Label>
+                  <Input
+                    id="partyLimit"
+                    type="number"
+                    step="0.01"
+                    // placeholder="e.g., 200000"
+                    default="200000"
+                    className="font-medium"
+                    {...register("partyLimit")}
+                  />
+                  {errors.partyLimit && (
+                    <p className="text-sm font-medium text-destructive mt-1.5">
+                      {errors.partyLimit.message}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </CardContent>
