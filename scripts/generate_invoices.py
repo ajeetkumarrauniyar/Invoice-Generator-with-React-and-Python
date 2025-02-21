@@ -254,9 +254,13 @@ class InvoiceGenerator:
                     Decimal("100."), rounding=ROUND_HALF_UP
                 )
 
-            # Generate invoice number
-            invoice_month = next_date.strftime("%b").upper()
-            invoice_no = f"{invoice_month}-{self.global_invoice_counter:03d}"
+            # Generate invoice number based on type
+            if self.invoice_type == 'sales':
+                invoice_no = f"A{self.global_invoice_counter:06d}"
+            else:
+                invoice_month = next_date.strftime("%b").upper()
+                invoice_no = f"{invoice_month}-{self.global_invoice_counter:03d}"
+            
             self.global_invoice_counter += 1
 
             return {
@@ -278,16 +282,22 @@ def generate_all_invoices(party_data, start_date, end_date, start_invoice_number
         generator = InvoiceGenerator(start_date, end_date, start_invoice_number, min_rate, max_rate, min_margin, max_margin, invoice_type)
         all_results = []
 
-        active_parties = []
-        for party_name, balance in party_data.items():
-            try:
-                remaining = Decimal(str(balance))
-                if remaining >= generator.min_invoice:
-                    normalized_name = normalize_party_name(party_name)
-                    active_parties.append({"name": normalized_name, "remaining": remaining})
-            except Exception as e:
-                print(f"Error processing party {party_name}: {str(e)}", file=sys.stderr)
-                continue
+        # For sales invoices, use single CASH party
+        if invoice_type == 'sales':
+            remaining = sum(Decimal(str(balance)) for balance in party_data.values())
+            active_parties = [{"name": "CASH", "remaining": remaining}]
+        else:
+            # For purchase invoices, use the existing party data logic
+            active_parties = []
+            for party_name, balance in party_data.items():
+                try:
+                    remaining = Decimal(str(balance))
+                    if remaining >= generator.min_invoice:
+                        normalized_name = normalize_party_name(party_name)
+                        active_parties.append({"name": normalized_name, "remaining": remaining})
+                except Exception as e:
+                    print(f"Error processing party {party_name}: {str(e)}", file=sys.stderr)
+                    continue
 
         if not active_parties:
             raise ValueError("No valid parties with sufficient balance found")
@@ -308,7 +318,7 @@ def generate_all_invoices(party_data, start_date, end_date, start_invoice_number
                         "Quantity (kg)": int(invoice["quantity"]),
                         "Sale Rate (Rs./kg)": format_rate(invoice["sale_rate"]),
                         "Invoice Value (Rs.)": float(invoice["invoice_value"]),
-                        "Flag": "Sale"
+                        "Flag": "S"
                     })
                 else:
                     all_results.append({
@@ -354,8 +364,13 @@ def main():
             max_margin = float(sys.argv[11])
             invoice_type = sys.argv[12] if len(sys.argv) == 13 else 'purchase'
             
-            # Generate party data
-            party_data = generate_party_dataset(total_amount, party_limit)
+            # Generate party data only for purchase invoices
+            if invoice_type == 'sales':
+                # For sales, use a single entry with the total amount
+                party_data = {"CASH": total_amount}
+            else:
+                # For purchases, generate party data as before
+                party_data = generate_party_dataset(total_amount, party_limit)
 
         elif len(sys.argv) in (10, 11):
             # Manual party data file mode
@@ -411,18 +426,23 @@ def main():
             invoice_type
         )
 
-        # Sort by invoice number
-        df["Month"] = df["Invoice No"].str[:3]
-        df["Invoice Number"] = df["Invoice No"].str[4:].astype(int)
-
-        month_order = {
-            "APR": 1, "MAY": 2, "JUN": 3, "JUL": 4, "AUG": 5, "SEP": 6,
-            "OCT": 7, "NOV": 8, "DEC": 9, "JAN": 10, "FEB": 11, "MAR": 12
-        }
-        df["Month Order"] = df["Month"].map(month_order)
-        df = df.sort_values(by=["Month Order", "Invoice Number"]).drop(
-            columns=["Month", "Month Order", "Invoice Number"]
-        )
+        # Sort by invoice number based on invoice type
+        if invoice_type == 'sales':
+            # For sales invoices (A000662 format), just sort by the numeric part
+            df["Invoice Number"] = df["Invoice No"].str[1:].astype(int)
+            df = df.sort_values(by=["Invoice Number"]).drop(columns=["Invoice Number"])
+        else:
+            # For purchase invoices (MON-000 format), keep existing month-based sorting
+            df["Month"] = df["Invoice No"].str[:3]
+            df["Invoice Number"] = df["Invoice No"].str[4:].astype(int)
+            month_order = {
+                "APR": 1, "MAY": 2, "JUN": 3, "JUL": 4, "AUG": 5, "SEP": 6,
+                "OCT": 7, "NOV": 8, "DEC": 9, "JAN": 10, "FEB": 11, "MAR": 12
+            }
+            df["Month Order"] = df["Month"].map(month_order)
+            df = df.sort_values(by=["Month Order", "Invoice Number"]).drop(
+                columns=["Month", "Month Order", "Invoice Number"]
+            )
 
         # Output as CSV to stdout
         df.to_csv(sys.stdout, index=False)
