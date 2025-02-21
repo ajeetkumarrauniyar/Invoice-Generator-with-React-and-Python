@@ -455,31 +455,26 @@ export default function InvoiceForm() {
               )}
             </div>
 
-            {invoiceType === "purchase" ? (
-              <div className="space-y-2.5">
-                <Label
-                  className="text-sm font-medium"
-                  htmlFor="startInvoiceNumber"
-                >
-                  Starting Invoice Number
-                </Label>
-                <Input
-                  id="startInvoiceNumber"
-                  type="number"
-                  placeholder="e.g., 1001"
-                  className="font-medium"
-                  {...register("startInvoiceNumber")}
-                />
-                {errors.startInvoiceNumber && (
-                  <p className="text-sm font-medium text-destructive mt-1.5">
-                    {errors.startInvoiceNumber.message}
-                  </p>
-                )}
-              </div>
-            ) : (
-              // Empty div to maintain grid layout
-              <div className="hidden md:block" aria-hidden="true" />
-            )}
+            <div className="space-y-2.5">
+              <Label
+                className="text-sm font-medium"
+                htmlFor="startInvoiceNumber"
+              >
+                Starting Invoice Number
+              </Label>
+              <Input
+                id="startInvoiceNumber"
+                type="number"
+                placeholder="e.g., 1001"
+                className="font-medium"
+                {...register("startInvoiceNumber")}
+              />
+              {errors.startInvoiceNumber && (
+                <p className="text-sm font-medium text-destructive mt-1.5">
+                  {errors.startInvoiceNumber.message}
+                </p>
+              )}
+            </div>
 
             <div className="space-y-2.5">
               <Label className="text-sm font-medium" htmlFor="productName">
