@@ -183,7 +183,8 @@ export default function InvoiceForm() {
       setValue("maxPurchaseRate", "23.65");
       setValue("minMarginPercentage", "0");
       setValue("maxMarginPercentage", "0");
-      setValue("totalAmount", 0);
+      setValue("totalAmount", "4500000");  // Set a default value
+      setValue("partyLimit", "200000");    // Set a default value even for sales
     } else {
       setValue("minPurchaseRate", "22.00");
       setValue("maxPurchaseRate", "23.00");
@@ -695,7 +696,14 @@ export default function InvoiceForm() {
             className="w-full font-semibold text-base py-6"
             disabled={isLoading}
           >
-            {isLoading ? "Generating..." : "Generate Invoices"}
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <span>Generating...</span>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+              </div>
+            ) : (
+              "Generate Invoices"
+            )}
           </Button>
         </CardFooter>
       </form>

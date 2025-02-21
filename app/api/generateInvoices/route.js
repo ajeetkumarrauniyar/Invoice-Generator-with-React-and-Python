@@ -47,6 +47,15 @@ export async function POST(request) {
       }
     }
 
+    if (data.invoiceType === "sales") {
+      if (!data.totalAmount) {
+        return NextResponse.json(
+          { message: "Total amount is required for sales invoices" },
+          { status: 400 }
+        );
+      }
+    }
+
     // Only validate totalAmount and partyLimit if generating parties automatically
     if (data.generateParties) {
       if (isNaN(data.totalAmount) || isNaN(data.partyLimit)) {
@@ -114,7 +123,7 @@ export async function POST(request) {
         "--generate",
         data.totalAmount.toString(),
         (data.partyLimit || 200000).toString(),
-        (data.productName || "WHOLE PADDY GRAINS"),
+        data.productName || "WHOLE PADDY GRAINS",
         (data.minPurchaseRate || 22).toString(),
         (data.maxPurchaseRate || 23).toString(),
         (data.minMarginPercentage || 0).toString(), // Default to 0 for sales
@@ -147,7 +156,7 @@ export async function POST(request) {
         data.endDate,
         (data.startInvoiceNumber || 1).toString(),
         partyDataPath,
-        (data.productName || "WHOLE PADDY GRAINS"),
+        data.productName || "WHOLE PADDY GRAINS",
         (data.minPurchaseRate || 22).toString(),
         (data.maxPurchaseRate || 23).toString(),
         (data.minMarginPercentage || 0).toString(), // Default to 0 for sales
@@ -222,11 +231,11 @@ export async function POST(request) {
             );
             return;
           }
-          
+
           // Create formatted filename
           const currentDate = new Date().toISOString().split('T')[0];
           const filename = `${data.invoiceType}_invoices_${currentDate}.csv`;
-          
+
           resolve(
             new NextResponse(csvData, {
               status: 200,
