@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useState } from "react";
+import { set, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import axios from "axios";
@@ -165,7 +165,7 @@ export default function InvoiceForm() {
       maxPurchaseRate: "23.00",
       minMarginPercentage: "2.25",
       maxMarginPercentage: "2.65",
-      productName: "Paddy",
+      productName: "WHOLE PADDY GRAINS",
       useFileUpload: false,
       dataEntryMode: "manual",
       generateParties: true,
@@ -174,6 +174,25 @@ export default function InvoiceForm() {
       invoiceType: "purchase",
     },
   });
+
+  const invoiceType = watch("invoiceType");
+
+  useEffect(() => {
+    if (invoiceType === "sales") {
+      setValue("minPurchaseRate", "22.50");
+      setValue("maxPurchaseRate", "23.65");
+      setValue("minMarginPercentage", "0");
+      setValue("maxMarginPercentage", "0");
+      setValue("totalAmount", 0);
+    } else {
+      setValue("minPurchaseRate", "22.00");
+      setValue("maxPurchaseRate", "23.00");
+      setValue("minMarginPercentage", "2.25");
+      setValue("maxMarginPercentage", "2.65");
+      setValue("totalAmount", "4500000");
+      setValue("partyLimit", "200000");
+    }
+  }, [invoiceType, setValue]);
 
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -190,8 +209,6 @@ export default function InvoiceForm() {
       }
     }
   };
-
-  const invoiceType = watch("invoiceType");
 
   const onSubmit = async (data) => {
     try {
@@ -283,7 +300,16 @@ export default function InvoiceForm() {
       );
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", "invoices.csv");
+
+      // Get filename from Content-Disposition header
+      const contentDisposition = response.headers.get("content-disposition");
+      const filename = contentDisposition
+        ? contentDisposition.split("filename=")[1].replace(/"/g, "")
+        : `${data.invoiceType}_invoices_${
+            new Date().toISOString().split("T")[0]
+          }.csv`;
+
+      link.setAttribute("download", filename);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -364,37 +390,33 @@ export default function InvoiceForm() {
           Generate Invoices
         </CardTitle>
         <CardDescription className="text-base text-gray-500">
-          <div className="flex items-center justify-between">
-            <span>
-              Fill in the details below to generate invoices with customized
-              parameters.
-            </span>
-            <div className="flex space-x-3">
-              <span
-                className={`text-md font-bold ${
-                  invoiceType === "purchase" ? "text-blue-500" : "text-gray-400"
-                }`}
-              >
-                Purchase
-              </span>
-              <Switch
-                checked={invoiceType === "sales"}
-                onCheckedChange={(checked) =>
-                  setValue("invoiceType", checked ? "sales" : "purchase", {
-                    shouldValidate: true,
-                  })
-                }
-              />
-              <span
-                className={`text-md font-bold ${
-                  invoiceType === "sales" ? "text-green-500" : "text-gray-400"
-                }`}
-              >
-                Sales
-              </span>
-            </div>
-          </div>
+          Fill in the details below to generate invoices with customized
+          parameters.
         </CardDescription>
+        <div className="mt-4 flex items-center justify-end space-x-3">
+          <span
+            className={`text-md font-bold ${
+              invoiceType === "purchase" ? "text-blue-500" : "text-gray-400"
+            }`}
+          >
+            Purchase
+          </span>
+          <Switch
+            checked={invoiceType === "sales"}
+            onCheckedChange={(checked) =>
+              setValue("invoiceType", checked ? "sales" : "purchase", {
+                shouldValidate: true,
+              })
+            }
+          />
+          <span
+            className={`text-md font-bold ${
+              invoiceType === "sales" ? "text-green-500" : "text-gray-400"
+            }`}
+          >
+            Sales
+          </span>
+        </div>
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
         <CardContent className="space-y-8">

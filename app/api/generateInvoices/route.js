@@ -222,12 +222,17 @@ export async function POST(request) {
             );
             return;
           }
+          
+          // Create formatted filename
+          const currentDate = new Date().toISOString().split('T')[0];
+          const filename = `${data.invoiceType}_invoices_${currentDate}.csv`;
+          
           resolve(
             new NextResponse(csvData, {
               status: 200,
               headers: {
                 "Content-Type": "text/csv",
-                "Content-Disposition": "attachment; filename=invoices.csv",
+                "Content-Disposition": `attachment; filename="${filename}"`,
               },
             })
           );
