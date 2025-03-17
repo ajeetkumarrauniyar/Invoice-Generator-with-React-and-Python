@@ -38,16 +38,37 @@ import traceback
 def generate_bihar_farmer_name():
     """Generate a realistic Bihar farmer name."""
     first_names = [
-        'Harinder', 'Vinod', 'Ajay', 'Lalan', 'Madan', 'Manish', 'Ramesh', 
-        'Suresh', 'Dinesh', 'Rajesh', 'Sanjay', 'Naveen', 'Ashok', 'Vijay', 
-        'Ravi', 'Mukesh', 'Amit', 'Rahul', 'Santosh', 'Naresh'
-    ]
-    
+    'Harinder', 'Vinod', 'Ajay', 'Lalan', 'Madan', 'Manish', 'Ramesh',
+    'Suresh', 'Dinesh', 'Rajesh', 'Sanjay', 'Naveen', 'Ashok', 'Vijay',
+    'Ravi', 'Mukesh', 'Amit', 'Rahul', 'Santosh', 'Naresh', 'Arjun', 'Babu',
+    'Chandan', 'Deepak', 'Gopal', 'Hemant', 'Inder', 'Jagdish', 'Kunal',
+    'Lakhan', 'Mohan', 'Nikhil', 'Omkar', 'Pawan', 'Rajan', 'Sameer',
+    'Tarun', 'Umesh', 'Vikram', 'Yogesh', 'Anil', 'Brijesh', 'Kamal',
+    'Mahesh', 'Prakash', 'Rakesh', 'Shekhar', 'Sohan', 'Uday', 'Vikas',
+    'Abhishek', 'Akash', 'Amar', 'Devesh', 'Divyansh', 'Gaurav', 'Harsh',
+    'Karan', 'Krishna', 'Lalit', 'Mohit', 'Pradeep', 'Rajat', 'Rohit', 'Shiv',
+    'Sumit', 'Varun', 'Yash', 'Ajeet', 'Abhay', 'Adarsh', 'Anant', 'Bhaskar',
+    'Chetan', 'Devendra', 'Eshwar', 'Firoz', 'Ganesh', 'Harendra', 'Ishaan',
+    'Jatin', 'Kailash', 'Lokesh', 'Manoj', 'Nitin', 'Omprakash', 'Piyush',
+    'Raghav', 'Satish', 'Tejas', 'Utkarsh', 'Vivek', 'Waheguru', 'Yuvraj',
+    'Zeeshan', 'Atul','Dharmendra','Gauranga','Jitendra','Pankaj','Prashant',
+    'Shyam','Subhash','Trilok','Tulsidas','Vaibhav','Vishal','Gautam','Ranjan','Mahendra','Shambhu'
+]
+
     last_names = [
-        'Sahu', 'Tiwari', 'Prasad', 'Jaiswal', 'Kumar', 'Singh', 'Yadav', 
-        'Mishra', 'Pandey', 'Verma', 'Gupta', 'Maurya', 'Patel', 'Dubey'
+    'Sahu', 'Tiwari', 'Prasad', 'Jaiswal', 'Kumar', 'Singh', 'Yadav',
+    'Mishra', 'Pandey', 'Verma', 'Gupta', 'Maurya', 'Patel', 'Dubey',
+    'Chaudhary', 'Das', 'Mandal', 'Nath', 'Rai', 'Shah', 'Sinha', 'Thakur',
+    'Roy', 'Khan', 'Ansari', 'Sharma', 'Paswan', 'Chauhan', 'Dwivedi',
+    'Gautam', 'Jha', 'Kashyap', 'Mandal', 'Nigam', 'Ranjan', 'Saxena',
+    'Srivastav', 'Tripathi', 'Vaidya', 'Agrawal', 'Bajpai', 'Chakraborty',
+    'Joshi', 'Kapoor', 'Khanna', 'Mehra', 'Rajput', 'Soni', 'Vyas', 'Bhatt',
+    'Chandra', 'Desai', 'Doshi', 'Dwivedi', 'Ghosh', 'Iyengar', 'Kale',
+    'Kulkarni', 'Lal', 'Lodha', 'Mohanty', 'Nair', 'Nayak', 'Negi',
+    'Pillai', 'Purohit', 'Rathore', 'Rawat', 'Sarkar', 'Seth', 'Shukla',
+    'Siddiqui', 'Soni','Saini','Bhardwaj','Rana','Malik','Tyagi','Goswami',
+    'Narang','Katiyar','Chauhan','Chawla'
     ]
-    
     return f"{random.choice(first_names)} {random.choice(last_names)}"
 
 # def generate_indian_business_names(count=10):
