@@ -1,6 +1,6 @@
-'use client'
+"use client";
 
-import InvoiceForm from '@/components/InvoiceForm'
+import InvoiceForm from "@/components/InvoiceForm";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
@@ -16,13 +16,17 @@ export default function Home() {
             <Button asChild className="flex justify-center items-center ml-4">
               <Link href="/vouchers">Vouchers</Link>
             </Button>
+            <Button asChild className="flex justify-center items-center ml-4">
+              <Link href="/gst">GST Planner</Link>
+            </Button>
           </div>
           <p className="mt-4 text-lg leading-relaxed text-gray-600 max-w-2xl mx-auto font-medium">
-            Generate invoices with customizable parameters and export as CSV. Simple, fast, and efficient.
+            Generate invoices with customizable parameters and export as CSV.
+            Simple, fast, and efficient.
           </p>
         </div>
         <InvoiceForm />
       </div>
     </div>
-  )
+  );
 }

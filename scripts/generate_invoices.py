@@ -51,8 +51,9 @@ def generate_bihar_farmer_name():
     'Chetan', 'Devendra', 'Eshwar', 'Firoz', 'Ganesh', 'Harendra', 'Ishaan',
     'Jatin', 'Kailash', 'Lokesh', 'Manoj', 'Nitin', 'Omprakash', 'Piyush',
     'Raghav', 'Satish', 'Tejas', 'Utkarsh', 'Vivek', 'Waheguru', 'Yuvraj',
-    'Zeeshan', 'Atul','Dharmendra','Gauranga','Jitendra','Pankaj','Prashant',
-    'Shyam','Subhash','Trilok','Tulsidas','Vaibhav','Vishal','Gautam','Ranjan','Mahendra','Shambhu'
+    'Zeeshan', 'Atul', 'Dharmendra', 'Gauranga', 'Jitendra', 'Pankaj', 'Prashant',
+    'Shyam', 'Subhash', 'Trilok', 'Tulsidas', 'Vaibhav', 'Vishal', 'Gautam', 'Ranjan',
+    'Mahendra', 'Shambhu'
 ]
 
     last_names = [
@@ -66,8 +67,8 @@ def generate_bihar_farmer_name():
     'Chandra', 'Desai', 'Doshi', 'Dwivedi', 'Ghosh', 'Iyengar', 'Kale',
     'Kulkarni', 'Lal', 'Lodha', 'Mohanty', 'Nair', 'Nayak', 'Negi',
     'Pillai', 'Purohit', 'Rathore', 'Rawat', 'Sarkar', 'Seth', 'Shukla',
-    'Siddiqui', 'Soni','Saini','Bhardwaj','Rana','Malik','Tyagi','Goswami',
-    'Narang','Katiyar','Chauhan','Chawla'
+    'Siddiqui', 'Soni', 'Saini', 'Bhardwaj', 'Rana', 'Malik', 'Tyagi', 'Goswami',
+    'Narang', 'Katiyar', 'Chauhan', 'Chawla'
     ]
     return f"{random.choice(first_names)} {random.choice(last_names)}"
 
