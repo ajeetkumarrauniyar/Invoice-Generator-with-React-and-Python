@@ -61,21 +61,13 @@ PARTIES_SHEET    = "B2B_PARTIES"
 
 def _sheet_range(sheet_name, cell_range):
     """
-    Safely builds an A1-notation range string for any sheet name.
-
-    Google Sheets API rules:
-    - Sheet names with spaces, hyphens, or special chars MUST be
-      wrapped in single quotes: 'FY2026-27'!A1
-    - If the sheet name itself contains a single quote, it must be
-      escaped by doubling it: "O'Brian" → 'O''Brian'!A1
-    - Plain alphanumeric names (no special chars) work without quotes
-      but quoting them is always safe, so we always quote.
-
-    This means ANY sheet name — including future ones with spaces,
-    slashes, parentheses, or apostrophes — will work correctly.
+    Builds A1-notation range for Sheets API v4.
+    No quotes — the REST client URL-encodes the range param automatically,
+    so quotes become %27 and break the API. Plain SheetName!Range works.
+    For truly tricky names (spaces, apostrophes), _get() falls back to
+    batchGet which handles them correctly.
     """
-    escaped = sheet_name.replace("'", "''")   # escape single quotes by doubling
-    return f"'{escaped}'!{cell_range}"
+    return f"{sheet_name}!{cell_range}"
 
 # FY2026-27 sheet layout (confirmed from Muskan sheet)
 PLANNING_DATA_START_ROW = 46   # April 2026 = row 46
@@ -134,6 +126,12 @@ class SheetsClient:
         return self._service
 
     def _get(self, spreadsheet_id, range_):
+        """
+        Uses spreadsheets.values.get — works for most sheet names.
+        Sheet names with hyphens work fine here (no quotes needed).
+        The `range` param is passed as-is; the client encodes it correctly
+        as long as we don't pre-add single quotes (those get double-encoded).
+        """
         try:
             result = self._get_service().spreadsheets().values().get(
                 spreadsheetId=spreadsheet_id,
@@ -142,6 +140,27 @@ class SheetsClient:
                 dateTimeRenderOption="SERIAL_NUMBER",
             ).execute()
             return result.get("values", [])
+        except HttpError as e:
+            # If plain name fails (e.g. name has spaces or apostrophes),
+            # try batchGet which uses a different URL encoding path
+            if e.status_code == 400:
+                return self._get_via_batch(spreadsheet_id, range_)
+            raise RuntimeError(f"Sheets API GET error ({range_}): {e}")
+
+    def _get_via_batch(self, spreadsheet_id, range_):
+        """
+        Fallback: batchGet handles tricky sheet names (spaces, apostrophes)
+        because it sends ranges as repeated query params instead of URL path.
+        """
+        try:
+            result = self._get_service().spreadsheets().values().batchGet(
+                spreadsheetId=spreadsheet_id,
+                ranges=[range_],
+                valueRenderOption="UNFORMATTED_VALUE",
+                dateTimeRenderOption="SERIAL_NUMBER",
+            ).execute()
+            vr = result.get("valueRanges", [])
+            return vr[0].get("values", []) if vr else []
         except HttpError as e:
             raise RuntimeError(f"Sheets API GET error ({range_}): {e}")
 
