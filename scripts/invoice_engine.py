@@ -275,12 +275,21 @@ def random_increasing_dates(month_yyyymm, count):
 # ─────────────────────────────────────────────
 
 def plan_party_invoices(party, invoice_numbers, month, warnings):
-    gstin, name, target = party["gstin"], party["party"], party["target"]
+    gstin, name, target_taxable = party["gstin"], party["party"], party["target"]
     pos = POS_NAMES.get(gstin[:2], f"{gstin[:2]}-Unknown")
     is_intra = gstin[:2] == SUPPLIER_STATE
     n = len(invoice_numbers)
 
-    total_q1, total_q2, agg_diff, agg_achieved = find_aggregate_cartons(target, RATE_1L, RATE_500ML)
+    # ── IMPORTANT: `target` is the TAXABLE value (tax-EXCLUSIVE), as entered
+    # in the Sales Planning Sheet's "B2B Sales @5%" column.
+    # Carton rates (₹2000 / ₹2020) are the tax-INCLUSIVE per-carton price,
+    # so we allocate cartons to hit an INVOICE-VALUE target = taxable × 1.05.
+    # The ₹50,000 e-way-bill cap applies to the INVOICE value (tax-inclusive).
+    target_invoice_value = round(target_taxable * (1 + GST_RATE / 100), 2)
+
+    total_q1, total_q2, agg_diff, agg_achieved = find_aggregate_cartons(
+        target_invoice_value, RATE_1L, RATE_500ML
+    )
 
     q1_parts = split_int_total(total_q1, n)
     q2_parts = split_int_total(total_q2, n)
@@ -289,37 +298,45 @@ def plan_party_invoices(party, invoice_numbers, month, warnings):
     dates = random_increasing_dates(month, n)
 
     rows = []
-    running_total = 0.0
+    running_taxable = 0.0
     for idx in range(n):
         q1, q2 = q1_parts[idx], q2_parts[idx]
-        achieved = q1 * RATE_1L + q2 * RATE_500ML
+        invoice_value = q1 * RATE_1L + q2 * RATE_500ML
+        taxable = round(invoice_value / (1 + GST_RATE / 100), 2)
+        tax_total = round(invoice_value - taxable, 2)
         rows.append({
             "invoice_no": invoice_numbers[idx], "date": dates[idx],
             "gstin": gstin, "receiver": name, "qty_1l": q1, "qty_500ml": q2,
-            "invoice_value": achieved, "pos": pos, "is_intra": is_intra,
+            "invoice_value": invoice_value, "taxable": taxable, "tax_total": tax_total,
+            "pos": pos, "is_intra": is_intra,
         })
-        running_total += achieved
+        running_taxable += taxable
 
-    # ── Round-off adjustment: force EXACT match to target.
-    # ₹2000/₹2020 combinations only land on multiples of ₹20 (their GCD),
-    # so a small rupee-level round-off on the last invoice is standard
-    # practice to reconcile against the stated monthly target — same as
-    # the "Round Off" line item on any commercial invoice.
-    final_diff = round(target - running_total, 2)
+    # ── Round-off adjustment: force the TAXABLE total to EXACTLY match the
+    # entered target (which is a taxable-value figure). ₹2000/₹2020 carton
+    # combos only land on multiples of ₹20, so a small rupee-level round-off
+    # on the last invoice's taxable value reconciles against the target —
+    # same idea as the "Round Off" line on any commercial invoice.
+    final_diff = round(target_taxable - running_taxable, 2)
     if final_diff != 0:
-        rows[-1]["invoice_value"] = round(rows[-1]["invoice_value"] + final_diff, 2)
+        last = rows[-1]
+        last["taxable"] = round(last["taxable"] + final_diff, 2)
+        # Recompute that invoice's value + tax from the adjusted taxable
+        last["invoice_value"] = round(last["taxable"] * (1 + GST_RATE / 100), 2)
+        last["tax_total"] = round(last["invoice_value"] - last["taxable"], 2)
         if abs(final_diff) > 20:
             warnings.append(
-                f"{name}: round-off adjustment of ₹{final_diff:.2f} applied to "
-                f"last invoice {rows[-1]['invoice_no']} — larger than usual, review."
+                f"{name}: round-off of ₹{final_diff:.2f} applied to last invoice "
+                f"{last['invoice_no']} taxable value — larger than usual, review."
             )
 
-    # Compute taxable/tax now that invoice values are final
+    # Cap check on INVOICE value (tax-inclusive)
     for r in rows:
-        r["taxable"] = round(r["invoice_value"] / (1 + GST_RATE / 100), 2)
-        r["tax_total"] = round(r["invoice_value"] - r["taxable"], 2)
         if r["invoice_value"] >= INVOICE_CAP:
-            warnings.append(f"{name}: invoice {r['invoice_no']} = ₹{r['invoice_value']:,.2f} — at/over ₹50,000 cap")
+            warnings.append(
+                f"{name}: invoice {r['invoice_no']} = ₹{r['invoice_value']:,.2f} "
+                f"(tax-incl) — at/over ₹50,000 cap"
+            )
 
     return rows
 
@@ -487,7 +504,7 @@ def main():
         invoice_cursor = next_invoice
 
         for party in parties:
-            n_invoices = max(1, -(-int(party["target"]) // 38000))
+            n_invoices = max(1, -(-int(party["target"]) // 36000))  # divide taxable target; 36000 taxable x 1.05 = 37800 invoice value, safely under 50k
             invoice_numbers = generate_invoice_numbers(invoice_cursor, n_invoices)
             rows = plan_party_invoices(party, invoice_numbers, month, warnings)
             all_rows.extend(rows)
@@ -570,7 +587,7 @@ def main():
     invoice_cursor = next_invoice
 
     for party in parties:
-        n_invoices = max(1, -(-int(party["target"]) // 38000))
+        n_invoices = max(1, -(-int(party["target"]) // 36000))  # divide taxable target; 36000 taxable x 1.05 = 37800 invoice value, safely under 50k
         invoice_numbers = generate_invoice_numbers(invoice_cursor, n_invoices)
         rows = plan_party_invoices(party, invoice_numbers, month, warnings)
         all_rows.extend(rows)
@@ -658,7 +675,7 @@ def main():
     invoice_cursor = next_invoice
 
     for party in parties:
-        n_invoices = max(1, -(-int(party["target"]) // 38000))
+        n_invoices = max(1, -(-int(party["target"]) // 36000))  # divide taxable target; 36000 taxable x 1.05 = 37800 invoice value, safely under 50k
         invoice_numbers = generate_invoice_numbers(invoice_cursor, n_invoices)
         rows = plan_party_invoices(party, invoice_numbers, month, warnings)
         all_rows.extend(rows)
