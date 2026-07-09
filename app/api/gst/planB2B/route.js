@@ -3,7 +3,6 @@ import { spawn } from "child_process";
 import path from "path";
 import fs from "fs/promises";
 
-// shared spawn helper — same pattern for all 3 GST routes
 function spawnPython(scriptPath, args) {
   const pythonPath = process.env.PYTHON_PATH || "python3";
   const cwd = process.cwd();
@@ -11,8 +10,7 @@ function spawnPython(scriptPath, args) {
     cwd,
     env: {
       ...process.env,
-      // Let db/ folder be importable from scripts/
-      PYTHONPATH: path.join(cwd, "db"),
+      PYTHONPATH: [path.join(cwd, "db"), path.join(cwd, "scripts")].join(":"),
     },
   });
 }
@@ -20,16 +18,24 @@ function spawnPython(scriptPath, args) {
 export async function POST(request) {
   let proc = null;
   try {
-    const { month, workbookPath } = await request.json();
-    if (!month) return NextResponse.json({ message: "month required (e.g. 052026)" }, { status: 400 });
+    const { month, gstin, spreadsheetId } = await request.json();
+
+    if (!month)
+      return NextResponse.json({ message: "month required (e.g. 052026)" }, { status: 400 });
+    if (!spreadsheetId)
+      return NextResponse.json({ message: "spreadsheetId required — company select karo" }, { status: 400 });
 
     const cwd = process.cwd();
     const scriptPath = path.join(cwd, "scripts", "invoice_engine.py");
-    const resolvedWorkbook = workbookPath
-      ? path.resolve(workbookPath)
-      : path.join(cwd, "GST_Monthwise_Ratewise_Bifurcation.xlsx");
 
-    proc = spawnPython(scriptPath, [resolvedWorkbook, month]);
+    // Sheets mode — NO local xlsx path, script reads directly from Google Sheets
+    const args = [
+      "--month",    month,
+      "--sheet-id", spreadsheetId,
+      ...(gstin ? ["--gstin", gstin] : []),
+    ];
+
+    proc = spawnPython(scriptPath, args);
 
     return new Promise((resolve) => {
       let stdout = [], stderr = [];
@@ -39,23 +45,22 @@ export async function POST(request) {
         resolve(NextResponse.json({ message: `Process error: ${e.message}` }, { status: 500 }))
       );
       proc.on("close", async (code) => {
-        const output = Buffer.concat(stdout).toString();
+        const output    = Buffer.concat(stdout).toString();
         const errOutput = Buffer.concat(stderr).toString();
         if (code !== 0) {
-          return resolve(NextResponse.json({ message: `Script error: ${errOutput || "Unknown"}`, output }, { status: 500 }));
+          return resolve(NextResponse.json({
+            message: `Script error: ${errOutput || "Unknown"}`, output,
+          }, { status: 500 }));
         }
         const invoiceMatch = output.match(/Total invoices generated:\s*(\d+)/);
         const warnings = output.split("\n")
           .filter(l => l.trim().startsWith("- "))
           .map(l => l.replace(/^[\s-]+/, ""));
-        let salesRecordsCsv = null;
-        try { salesRecordsCsv = await fs.readFile(path.join(cwd, "sales_records_addition.csv"), "utf-8"); } catch (_) {}
         resolve(NextResponse.json({
           success: true,
           totalInvoices: invoiceMatch ? parseInt(invoiceMatch[1]) : null,
           warnings,
           output,
-          salesRecordsCsv,
         }));
       });
     });
