@@ -480,16 +480,28 @@ export default function GSTPlanner() {
                 <tbody className="divide-y divide-gray-100 bg-white">
                   {records.map((r) => (
                     <tr key={r.invoice_no} className="hover:bg-gray-50">
-                      <td className="px-3 py-2 font-mono font-medium text-indigo-700">{r.invoice_no}</td>
-                      <td className="px-3 py-2 text-gray-600">{r.invoice_date?.slice(0, 10)}</td>
-                      <td className="px-3 py-2">
-                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-                          r.invoice_type === "B2B" ? "bg-blue-100 text-blue-700" :
-                          r.invoice_type?.startsWith("B2C") ? "bg-purple-100 text-purple-700" :
-                          "bg-gray-100 text-gray-600"
-                        }`}>{r.invoice_type}</span>
+                      <td className="px-3 py-2 font-mono font-medium text-indigo-700">
+                        {r.invoice_no}
                       </td>
-                      <td className="px-3 py-2 text-gray-700 max-w-[160px] truncate">{r.party_name || "—"}</td>
+                      <td className="px-3 py-2 text-gray-600">
+                        {r.invoice_date?.slice(0, 10)}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                            r.invoice_type === "B2B"
+                              ? "bg-blue-100 text-blue-700"
+                              : r.invoice_type?.startsWith("B2C")
+                                ? "bg-purple-100 text-purple-700"
+                                : "bg-gray-100 text-gray-600"
+                          }`}
+                        >
+                          {r.invoice_type}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-gray-700 max-w-[160px] truncate">
+                        {r.party_name || "—"}
+                      </td>
                       <td className="px-3 py-2 text-right tabular-nums">
                         {Number(r.taxable_value).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
                       </td>
