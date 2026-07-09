@@ -58,6 +58,25 @@ HSN_B2B_SHEET    = "GSTR1-HSN-B2B"
 RECORDS_SHEET    = "B2B-SALES-RECORDS"
 PARTIES_SHEET    = "B2B_PARTIES"
 
+
+def _sheet_range(sheet_name, cell_range):
+    """
+    Safely builds an A1-notation range string for any sheet name.
+
+    Google Sheets API rules:
+    - Sheet names with spaces, hyphens, or special chars MUST be
+      wrapped in single quotes: 'FY2026-27'!A1
+    - If the sheet name itself contains a single quote, it must be
+      escaped by doubling it: "O'Brian" → 'O''Brian'!A1
+    - Plain alphanumeric names (no special chars) work without quotes
+      but quoting them is always safe, so we always quote.
+
+    This means ANY sheet name — including future ones with spaces,
+    slashes, parentheses, or apostrophes — will work correctly.
+    """
+    escaped = sheet_name.replace("'", "''")   # escape single quotes by doubling
+    return f"'{escaped}'!{cell_range}"
+
 # FY2026-27 sheet layout (confirmed from Muskan sheet)
 PLANNING_DATA_START_ROW = 46   # April 2026 = row 46
 COL_MONTH        = 1   # A
@@ -152,7 +171,7 @@ class SheetsClient:
 
     def read_supplier_info(self, spreadsheet_id):
         """M1 = GSTIN, M2 = Trade Name from Executive Dashboard."""
-        rows = self._get(spreadsheet_id, f"{PLANNING_SHEET}!M1:M2")
+        rows = self._get(spreadsheet_id, _sheet_range(PLANNING_SHEET, "M1:M2"))
         gstin      = rows[0][0] if rows and rows[0] else None
         trade_name = rows[1][0] if len(rows) > 1 and rows[1] else None
         return (str(gstin).strip() if gstin else None,
@@ -172,7 +191,7 @@ class SheetsClient:
         yyyy = int(fp[2:])
 
         # Read A:P from row 46 onwards (data section)
-        rows = self._get(spreadsheet_id, f"{PLANNING_SHEET}!A{PLANNING_DATA_START_ROW}:P200")
+        rows = self._get(spreadsheet_id, _sheet_range(PLANNING_SHEET, f"A{PLANNING_DATA_START_ROW}:P200"))
 
         for i, row in enumerate(rows):
             if not row:
@@ -237,7 +256,7 @@ class SheetsClient:
 
     def read_b2b_parties(self, spreadsheet_id):
         """Reads B2B_PARTIES sheet: GSTIN | Party | Target"""
-        rows = self._get(spreadsheet_id, f"{PARTIES_SHEET}!A2:C100")
+        rows = self._get(spreadsheet_id, _sheet_range(PARTIES_SHEET, "A2:C100"))
         parties = []
         for row in rows:
             if len(row) < 3 or not row[0]:
@@ -260,7 +279,7 @@ class SheetsClient:
         """Scans B2B-SALES-RECORDS for the highest invoice number in given series."""
         import re
         pattern = re.compile(rf"^({re.escape(series)})(\d+)$")
-        rows = self._get(spreadsheet_id, f"{RECORDS_SHEET}!A1:J500")
+        rows = self._get(spreadsheet_id, _sheet_range(RECORDS_SHEET, "A1:J500"))
         best = None
         for row in rows:
             for cell in row:
@@ -286,7 +305,7 @@ class SheetsClient:
         rows: list of invoice dicts from invoice_engine.py
         """
         # Clear existing data (rows 5 onwards)
-        self._clear(spreadsheet_id, f"{B2B_SHEET}!A{B2B_DATA_START}:M500")
+        self._clear(spreadsheet_id, _sheet_range(B2B_SHEET, f"A{B2B_DATA_START}:M500"))
 
         supplier_gstin = self.read_supplier_info(spreadsheet_id)[0] or ""
         supplier_state = supplier_gstin[:2] if supplier_gstin else "10"
@@ -314,7 +333,7 @@ class SheetsClient:
             ])
 
         if values:
-            self._update(spreadsheet_id, f"{B2B_SHEET}!A{B2B_DATA_START}", values)
+            self._update(spreadsheet_id, _sheet_range(B2B_SHEET, f"A{B2B_DATA_START}"), values)
         return len(values)
 
     # ─────────────────────────────────────────────
@@ -323,7 +342,7 @@ class SheetsClient:
 
     def write_hsn_b2b(self, spreadsheet_id, rows):
         """Clears and writes HSN-B2B summary row."""
-        self._clear(spreadsheet_id, f"{HSN_B2B_SHEET}!A{HSN_DATA_START}:K100")
+        self._clear(spreadsheet_id, _sheet_range(HSN_B2B_SHEET, f"A{HSN_DATA_START}:K100"))
 
         total_qty    = sum(r.get("qty_1l", 0) + r.get("qty_500ml", 0) for r in rows)
         taxable_sum  = sum(r["taxable"] for r in rows)
@@ -332,7 +351,7 @@ class SheetsClient:
         camt         = round(tax_sum / 2, 2)
         samt         = round(tax_sum - camt, 2)
 
-        self._update(spreadsheet_id, f"{HSN_B2B_SHEET}!A{HSN_DATA_START}", [[
+        self._update(spreadsheet_id, _sheet_range(HSN_B2B_SHEET, f"A{HSN_DATA_START}"), [[
             "151499", "", "CTN", total_qty, total_val,
             GST_RATE, round(taxable_sum, 2), 0, camt, samt, 0
         ]])
@@ -348,18 +367,18 @@ class SheetsClient:
         Finds the first empty row after existing data and appends there.
         Does NOT restructure the existing sheet — safe for month-by-month use.
         """
-        existing = self._get(spreadsheet_id, f"{RECORDS_SHEET}!A1:J1000")
+        existing = self._get(spreadsheet_id, _sheet_range(RECORDS_SHEET, "A1:J1000"))
         # Find first completely empty row
         first_empty = len(existing) + 1
 
         # Add a month header row first
         header = [[month_label, "", "", "", "", "", "", "", "", ""]]
-        self._update(spreadsheet_id, f"{RECORDS_SHEET}!A{first_empty}", header)
+        self._update(spreadsheet_id, _sheet_range(RECORDS_SHEET, f"A{first_empty}"), header)
 
         # Column headers
         col_header = [["Sl", "Invoice No.", "Invoice Date", "GSTIN", "Receiver Name",
                         "1 Ltr CTN", "500ml CTN", "Taxable Value (₹)", "GST @5% (₹)", "Invoice Value (₹)"]]
-        self._update(spreadsheet_id, f"{RECORDS_SHEET}!A{first_empty + 1}", col_header)
+        self._update(spreadsheet_id, _sheet_range(RECORDS_SHEET, f"A{first_empty + 1}"), col_header)
 
         # Data rows
         data = []
@@ -379,7 +398,7 @@ class SheetsClient:
             ])
 
         if data:
-            self._update(spreadsheet_id, f"{RECORDS_SHEET}!A{first_empty + 2}", data)
+            self._update(spreadsheet_id, _sheet_range(RECORDS_SHEET, f"A{first_empty + 2}"), data)
 
         return len(data)
 
