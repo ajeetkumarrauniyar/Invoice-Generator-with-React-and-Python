@@ -502,16 +502,15 @@ def main():
 
         print(f"\n  Total invoices generated: {len(all_rows)}")
 
-        # Write back to Sheets
+        # Write back to Sheets (only GSTR1-B2B & HSN — the GST filing sheets)
         b2b_count = client.write_b2b_invoices(sheet_id, all_rows)
         print(f"  ✓ GSTR1-B2B sheet updated: {b2b_count} rows")
         client.write_hsn_b2b(sheet_id, all_rows)
         print(f"  ✓ GSTR1-HSN-B2B sheet updated")
 
-        import calendar as _cal
-        month_label = f"{_cal.month_abbr[int(month[:2])]}-{month[2:]}"
-        rec_count = client.append_sales_records(sheet_id, all_rows, month_label)
-        print(f"  ✓ B2B-SALES-RECORDS appended: {rec_count} rows")
+        # NOTE: B2B-SALES-RECORDS sheet is no longer written — that data now
+        # lives in NeonDB. View/export it anytime via the Reports page
+        # (queries the DB live, ERP-ready format).
 
         # DB save
         if DB_AVAILABLE:

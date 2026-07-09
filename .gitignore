@@ -55,3 +55,9 @@ var/
 
 # Vercel
 .vercel 
+
+# Local development
+*.xlsx
+*.csv
+*.xls
+.venv

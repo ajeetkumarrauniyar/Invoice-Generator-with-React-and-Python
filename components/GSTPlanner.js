@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
+import Link from "next/link";
 
 // ─── helpers ───────────────────────────────────────────────
 function downloadFile(content, filename, mime = "application/octet-stream") {
@@ -74,8 +75,8 @@ export default function GSTPlanner() {
   // Load companies on mount
   useState(() => {
     fetch("/api/gst/companies")
-      .then(r => r.json())
-      .then(d => {
+      .then((r) => r.json())
+      .then((d) => {
         setCompanies(d.companies || []);
         if (d.companies?.length === 1) setSelectedCo(d.companies[0]);
       })
@@ -290,30 +291,48 @@ export default function GSTPlanner() {
             {companies.length > 1 && (
               <select
                 value={selectedCo?.gstin || ""}
-                onChange={e => setSelectedCo(companies.find(c => c.gstin === e.target.value) || null)}
+                onChange={(e) =>
+                  setSelectedCo(
+                    companies.find((c) => c.gstin === e.target.value) || null,
+                  )
+                }
                 className="border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-white font-medium text-gray-800"
               >
                 <option value="">Select Company</option>
-                {companies.map(c => (
-                  <option key={c.gstin} value={c.gstin}>{c.short_name} — {c.gstin}</option>
+                {companies.map((c) => (
+                  <option key={c.gstin} value={c.gstin}>
+                    {c.short_name} — {c.gstin}
+                  </option>
                 ))}
               </select>
             )}
-            {selectedCo && (
-              <span className="text-xs text-gray-400 font-mono hidden sm:block">{selectedCo.trade_name}</span>
-            )}
-            <Label htmlFor="month" className="text-sm font-medium text-gray-700 whitespace-nowrap">
+            {/* {selectedCo && (
+              <span className="text-xs text-gray-400 font-mono hidden sm:block">
+                {selectedCo.trade_name}
+              </span>
+            )} */}
+            <Label
+              htmlFor="month"
+              className="text-sm font-medium text-gray-700 whitespace-nowrap"
+            >
               Tax Period
             </Label>
             <Input
               id="month"
               placeholder="052026"
               value={month}
-              onChange={e => setMonth(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              onChange={(e) =>
+                setMonth(e.target.value.replace(/\D/g, "").slice(0, 6))
+              }
               className="w-28 text-center font-mono"
             />
-            <span className="text-sm text-gray-400 font-mono min-w-[48px]">{mmyyyy}</span>
+            {/* <span className="text-sm text-gray-400 font-mono min-w-[48px]">
+              {mmyyyy}
+            </span> */}
           </div>
+          <Button asChild className="flex justify-center items-center ml-4">
+            <Link href="/reports">Reports</Link>
+          </Button>
         </div>
       </div>
 
