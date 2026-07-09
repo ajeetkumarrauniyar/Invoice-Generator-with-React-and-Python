@@ -439,8 +439,10 @@ def main():
     p.add_argument("month_pos", nargs="?", default=None, help="MMYYYY positional (local mode)")
     # New named args (Sheets / web mode)
     p.add_argument("--month",    default=None, help="MMYYYY e.g. 062026")
-    p.add_argument("--gstin",    default=None, help="Supplier GSTIN (overrides sheet M1)")
-    p.add_argument("--sheet-id", default=None, help="Google Sheets spreadsheet ID")
+    p.add_argument("--gstin",          default=None, help="Supplier GSTIN (overrides sheet M1)")
+    p.add_argument("--sheet-id",       default=None, help="Google Sheets spreadsheet ID")
+    p.add_argument("--planning-sheet", default="Master Working - FY 2026-27",
+                   help="Sheet tab name for Sales Planning (default: 'Master Working - FY 2026-27')")
     p.add_argument("--outfile",  default=None, help="Output xlsx path (local mode only)")
     p.add_argument("--inplace",  action="store_true")
     args = p.parse_args()
@@ -462,7 +464,7 @@ def main():
             sys.exit(f"Sheets import failed: {e}\nInstall: pip install google-auth google-auth-httplib2 google-api-python-client --break-system-packages")
 
         client = SheetsClient()
-        supplier_gstin, trade_name = client.read_supplier_info(sheet_id)
+        supplier_gstin, trade_name = client.read_supplier_info(sheet_id, args.planning_sheet)
         if args.gstin:
             supplier_gstin = args.gstin
         if not supplier_gstin:
@@ -519,15 +521,8 @@ def main():
 
         print(f"\n  Total invoices generated: {len(all_rows)}")
 
-        # Write back to Sheets (only GSTR1-B2B & HSN — the GST filing sheets)
-        b2b_count = client.write_b2b_invoices(sheet_id, all_rows)
-        print(f"  ✓ GSTR1-B2B sheet updated: {b2b_count} rows")
-        client.write_hsn_b2b(sheet_id, all_rows)
-        print(f"  ✓ GSTR1-HSN-B2B sheet updated")
-
-        # NOTE: B2B-SALES-RECORDS sheet is no longer written — that data now
-        # lives in NeonDB. View/export it anytime via the Reports page
-        # (queries the DB live, ERP-ready format).
+        # Data saved to NeonDB — no Sheets write needed
+        # GSTR1-B2B and HSN data comes from DB when generating JSON
 
         # DB save
         if DB_AVAILABLE:

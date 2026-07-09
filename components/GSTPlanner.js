@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
-import Link from "next/link";
 
 // ─── helpers ───────────────────────────────────────────────
 function downloadFile(content, filename, mime = "application/octet-stream") {
@@ -75,8 +74,8 @@ export default function GSTPlanner() {
   // Load companies on mount
   useState(() => {
     fetch("/api/gst/companies")
-      .then((r) => r.json())
-      .then((d) => {
+      .then(r => r.json())
+      .then(d => {
         setCompanies(d.companies || []);
         if (d.companies?.length === 1) setSelectedCo(d.companies[0]);
       })
@@ -115,7 +114,7 @@ export default function GSTPlanner() {
       const res = await fetch("/api/gst/planB2B", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ month, gstin: selectedCo?.gstin, spreadsheetId: selectedCo?.spreadsheet_id }),
+        body: JSON.stringify({ month, gstin: selectedCo?.gstin, spreadsheetId: selectedCo?.spreadsheet_id, planningSheet: selectedCo?.planning_sheet }),
       });
       const data = await res.json();
 
@@ -160,7 +159,7 @@ export default function GSTPlanner() {
       const res = await fetch("/api/gst/generateB2C", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ month, hsn18: hsn18 || undefined, gstin: selectedCo?.gstin, spreadsheetId: selectedCo?.spreadsheet_id }),
+        body: JSON.stringify({ month, hsn18: hsn18 || undefined, gstin: selectedCo?.gstin, spreadsheetId: selectedCo?.spreadsheet_id, planningSheet: selectedCo?.planning_sheet }),
       });
       const data = await res.json();
 
@@ -202,7 +201,7 @@ export default function GSTPlanner() {
       const res = await fetch("/api/gst/buildJSON", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ month, gstin: selectedCo?.gstin, spreadsheetId: selectedCo?.spreadsheet_id }),
+        body: JSON.stringify({ month, gstin: selectedCo?.gstin, spreadsheetId: selectedCo?.spreadsheet_id, planningSheet: selectedCo?.planning_sheet }),
       });
 
       if (!res.ok) {
@@ -291,48 +290,30 @@ export default function GSTPlanner() {
             {companies.length > 1 && (
               <select
                 value={selectedCo?.gstin || ""}
-                onChange={(e) =>
-                  setSelectedCo(
-                    companies.find((c) => c.gstin === e.target.value) || null,
-                  )
-                }
+                onChange={e => setSelectedCo(companies.find(c => c.gstin === e.target.value) || null)}
                 className="border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-white font-medium text-gray-800"
               >
                 <option value="">Select Company</option>
-                {companies.map((c) => (
-                  <option key={c.gstin} value={c.gstin}>
-                    {c.short_name} — {c.gstin}
-                  </option>
+                {companies.map(c => (
+                  <option key={c.gstin} value={c.gstin}>{c.short_name} — {c.gstin}</option>
                 ))}
               </select>
             )}
-            {/* {selectedCo && (
-              <span className="text-xs text-gray-400 font-mono hidden sm:block">
-                {selectedCo.trade_name}
-              </span>
-            )} */}
-            <Label
-              htmlFor="month"
-              className="text-sm font-medium text-gray-700 whitespace-nowrap"
-            >
+            {selectedCo && (
+              <span className="text-xs text-gray-400 font-mono hidden sm:block">{selectedCo.trade_name}</span>
+            )}
+            <Label htmlFor="month" className="text-sm font-medium text-gray-700 whitespace-nowrap">
               Tax Period
             </Label>
             <Input
               id="month"
               placeholder="052026"
               value={month}
-              onChange={(e) =>
-                setMonth(e.target.value.replace(/\D/g, "").slice(0, 6))
-              }
+              onChange={e => setMonth(e.target.value.replace(/\D/g, "").slice(0, 6))}
               className="w-28 text-center font-mono"
             />
-            {/* <span className="text-sm text-gray-400 font-mono min-w-[48px]">
-              {mmyyyy}
-            </span> */}
+            <span className="text-sm text-gray-400 font-mono min-w-[48px]">{mmyyyy}</span>
           </div>
-          <Button asChild className="flex justify-center items-center ml-4">
-            <Link href="/reports">Reports</Link>
-          </Button>
         </div>
       </div>
 
@@ -480,28 +461,16 @@ export default function GSTPlanner() {
                 <tbody className="divide-y divide-gray-100 bg-white">
                   {records.map((r) => (
                     <tr key={r.invoice_no} className="hover:bg-gray-50">
-                      <td className="px-3 py-2 font-mono font-medium text-indigo-700">
-                        {r.invoice_no}
-                      </td>
-                      <td className="px-3 py-2 text-gray-600">
-                        {r.invoice_date?.slice(0, 10)}
-                      </td>
+                      <td className="px-3 py-2 font-mono font-medium text-indigo-700">{r.invoice_no}</td>
+                      <td className="px-3 py-2 text-gray-600">{r.invoice_date?.slice(0, 10)}</td>
                       <td className="px-3 py-2">
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-                            r.invoice_type === "B2B"
-                              ? "bg-blue-100 text-blue-700"
-                              : r.invoice_type?.startsWith("B2C")
-                                ? "bg-purple-100 text-purple-700"
-                                : "bg-gray-100 text-gray-600"
-                          }`}
-                        >
-                          {r.invoice_type}
-                        </span>
+                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                          r.invoice_type === "B2B" ? "bg-blue-100 text-blue-700" :
+                          r.invoice_type?.startsWith("B2C") ? "bg-purple-100 text-purple-700" :
+                          "bg-gray-100 text-gray-600"
+                        }`}>{r.invoice_type}</span>
                       </td>
-                      <td className="px-3 py-2 text-gray-700 max-w-[160px] truncate">
-                        {r.party_name || "—"}
-                      </td>
+                      <td className="px-3 py-2 text-gray-700 max-w-[160px] truncate">{r.party_name || "—"}</td>
                       <td className="px-3 py-2 text-right tabular-nums">
                         {Number(r.taxable_value).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
                       </td>

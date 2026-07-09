@@ -404,8 +404,10 @@ def main():
     p.add_argument("month_pos",  nargs="?", default=None)
     # Named args (Sheets / web mode)
     p.add_argument("--month",        default=None)
-    p.add_argument("--gstin",        default=None)
-    p.add_argument("--sheet-id",     default=None, help="Google Sheets spreadsheet ID")
+    p.add_argument("--gstin",          default=None)
+    p.add_argument("--sheet-id",       default=None, help="Google Sheets spreadsheet ID")
+    p.add_argument("--planning-sheet", default="Master Working - FY 2026-27",
+                   help="Sheet tab name for Sales Planning")
     p.add_argument("--start-invoice", default=None)
     p.add_argument("--hsn5",         default="151499")
     p.add_argument("--hsn18",        default="TBD")
@@ -431,12 +433,12 @@ def main():
             sys.exit(f"Sheets import failed: {e}")
 
         client = SheetsClient()
-        supplier_gstin, _ = client.read_supplier_info(sheet_id)
+        supplier_gstin, _ = client.read_supplier_info(sheet_id, args.planning_sheet)
         if args.gstin: supplier_gstin = args.gstin
         if not supplier_gstin:
             sys.exit("ERROR: GSTIN not found in sheet M1 and --gstin not given")
 
-        targets = client.read_month_targets(sheet_id, month)
+        targets = client.read_month_targets(sheet_id, args.planning_sheet, month)
 
         # Auto-detect CM start
         start_invoice = args.start_invoice

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { spawn } from "child_process";
 import path from "path";
-import fs from "fs/promises";
 
 function spawnPython(scriptPath, args) {
   const pythonPath = process.env.PYTHON_PATH || "python3";
@@ -18,21 +17,19 @@ function spawnPython(scriptPath, args) {
 export async function POST(request) {
   let proc = null;
   try {
-    const { month, gstin, spreadsheetId } = await request.json();
+    const { month, gstin, spreadsheetId, planningSheet } = await request.json();
 
-    if (!month)
-      return NextResponse.json({ message: "month required (e.g. 052026)" }, { status: 400 });
-    if (!spreadsheetId)
-      return NextResponse.json({ message: "spreadsheetId required — company select karo" }, { status: 400 });
+    if (!month)        return NextResponse.json({ message: "month required" }, { status: 400 });
+    if (!spreadsheetId) return NextResponse.json({ message: "company select karo" }, { status: 400 });
 
-    const cwd = process.cwd();
+    const cwd        = process.cwd();
     const scriptPath = path.join(cwd, "scripts", "invoice_engine.py");
 
-    // Sheets mode — NO local xlsx path, script reads directly from Google Sheets
     const args = [
       "--month",    month,
       "--sheet-id", spreadsheetId,
-      ...(gstin ? ["--gstin", gstin] : []),
+      ...(gstin         ? ["--gstin", gstin]                   : []),
+      ...(planningSheet ? ["--planning-sheet", planningSheet]  : []),
     ];
 
     proc = spawnPython(scriptPath, args);
@@ -48,20 +45,13 @@ export async function POST(request) {
         const output    = Buffer.concat(stdout).toString();
         const errOutput = Buffer.concat(stderr).toString();
         if (code !== 0) {
-          return resolve(NextResponse.json({
-            message: `Script error: ${errOutput || "Unknown"}`, output,
-          }, { status: 500 }));
+          return resolve(NextResponse.json({ message: errOutput || "Script error", output }, { status: 500 }));
         }
         const invoiceMatch = output.match(/Total invoices generated:\s*(\d+)/);
         const warnings = output.split("\n")
           .filter(l => l.trim().startsWith("- "))
           .map(l => l.replace(/^[\s-]+/, ""));
-        resolve(NextResponse.json({
-          success: true,
-          totalInvoices: invoiceMatch ? parseInt(invoiceMatch[1]) : null,
-          warnings,
-          output,
-        }));
+        resolve(NextResponse.json({ success: true, totalInvoices: invoiceMatch ? parseInt(invoiceMatch[1]) : null, warnings, output }));
       });
     });
   } catch (e) {

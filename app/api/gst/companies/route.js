@@ -7,15 +7,15 @@ function getSql() {
   return neon(url);
 }
 
-// GET /api/gst/companies — list all active companies
 export async function GET() {
   try {
     const sql = getSql();
     const companies = await sql.query(
-      `SELECT gstin, trade_name, short_name, state_code, spreadsheet_id
+      `SELECT gstin, trade_name, short_name, state_code,
+              spreadsheet_id, planning_sheet
        FROM companies
        WHERE is_active = TRUE
-       ORDER BY trade_name`,
+       ORDER BY short_name`,
       []
     );
     return NextResponse.json({ companies });

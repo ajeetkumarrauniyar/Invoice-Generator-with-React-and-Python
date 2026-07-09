@@ -18,12 +18,10 @@ function spawnPython(scriptPath, args) {
 export async function POST(request) {
   let proc = null;
   try {
-    const { month, gstin, spreadsheetId, hsn5, hsn18, hsnExempt } = await request.json();
+    const { month, gstin, spreadsheetId, planningSheet, hsn5, hsn18, hsnExempt } = await request.json();
 
-    if (!month)
-      return NextResponse.json({ message: "month required" }, { status: 400 });
-    if (!spreadsheetId)
-      return NextResponse.json({ message: "Company select karo pehle" }, { status: 400 });
+    if (!month)         return NextResponse.json({ message: "month required" }, { status: 400 });
+    if (!spreadsheetId) return NextResponse.json({ message: "company select karo" }, { status: 400 });
 
     const cwd        = process.cwd();
     const scriptPath = path.join(cwd, "scripts", "b2c_generator.py");
@@ -33,10 +31,11 @@ export async function POST(request) {
       "--month",    month,
       "--sheet-id", spreadsheetId,
       "--outdir",   b2cOutdir,
-      ...(gstin     ? ["--gstin", gstin]           : []),
-      ...(hsn5      ? ["--hsn5",  hsn5]            : []),
-      ...(hsn18     ? ["--hsn18", hsn18]           : []),
-      ...(hsnExempt ? ["--hsn-exempt", hsnExempt]  : []),
+      ...(gstin         ? ["--gstin", gstin]                  : []),
+      ...(planningSheet ? ["--planning-sheet", planningSheet] : []),
+      ...(hsn5          ? ["--hsn5", hsn5]                   : []),
+      ...(hsn18         ? ["--hsn18", hsn18]                  : []),
+      ...(hsnExempt     ? ["--hsn-exempt", hsnExempt]         : []),
     ];
 
     proc = spawnPython(scriptPath, args);
@@ -52,30 +51,25 @@ export async function POST(request) {
         const output    = Buffer.concat(stdout).toString();
         const errOutput = Buffer.concat(stderr).toString();
         if (code !== 0) {
-          return resolve(NextResponse.json({
-            message: `Script error: ${errOutput || "Unknown"}`, output,
-          }, { status: 500 }));
+          return resolve(NextResponse.json({ message: errOutput || "Script error", output }, { status: 500 }));
         }
         const rangeMatch = output.match(/Invoice range\s*:\s*(\S+)\s*→\s*(\S+)/);
         const countMatch = output.match(/Total invoices:\s*(\d+)/);
         const warnings   = output.split("\n")
           .filter(l => l.trim().startsWith("- "))
           .map(l => l.replace(/^[\s-]+/, ""));
-
         const readCsv = async (name) => {
-          try { return await fs.readFile(path.join(b2cOutdir, name), "utf-8"); }
-          catch { return null; }
+          try { return await fs.readFile(path.join(b2cOutdir, name), "utf-8"); } catch { return null; }
         };
         const [b2csCsv, exempCsv, hsnB2cCsv, recordsCsv] = await Promise.all([
           readCsv("b2cs_rows.csv"), readCsv("exemp_row.csv"),
           readCsv("hsn_b2c_rows.csv"), readCsv("cash_sales_records.csv"),
         ]);
-
         resolve(NextResponse.json({
           success: true,
-          totalInvoices: countMatch  ? parseInt(countMatch[1])  : null,
-          invoiceFrom:   rangeMatch?.[1] ?? null,
-          invoiceTo:     rangeMatch?.[2] ?? null,
+          totalInvoices: countMatch ? parseInt(countMatch[1]) : null,
+          invoiceFrom: rangeMatch?.[1] ?? null,
+          invoiceTo:   rangeMatch?.[2] ?? null,
           warnings, output,
           files: { b2csCsv, exempCsv, hsnB2cCsv, cashRecordsCsv: recordsCsv },
         }));
