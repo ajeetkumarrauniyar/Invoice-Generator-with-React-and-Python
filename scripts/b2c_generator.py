@@ -65,7 +65,10 @@ except ImportError:
 
 # DB integration — optional
 try:
-    from db import get_last_invoice_number, save_invoices, save_monthly_targets
+    from db import (
+        get_last_invoice_number, save_invoices, save_monthly_targets,
+        check_month_generated, delete_month_invoices,
+    )
     DB_AVAILABLE = True
 except Exception:
     DB_AVAILABLE = False
@@ -413,6 +416,8 @@ def main():
     p.add_argument("--hsn18",        default="TBD")
     p.add_argument("--hsn-exempt",   default="1005")
     p.add_argument("--outdir",       default="b2c_output")
+    p.add_argument("--force-regenerate", action="store_true",
+                   help="Delete existing B2C/Exempt data for this month and regenerate fresh.")
     args = p.parse_args()
 
     month     = args.month or args.month_pos
@@ -423,6 +428,49 @@ def main():
     use_sheets = bool(sheet_id)
     outdir     = Path(args.outdir)
     outdir.mkdir(parents=True, exist_ok=True)
+
+    # ── STATE CHECK ──────────────────────────────────────────────────────
+    early_gstin = args.gstin
+    if not early_gstin and DB_AVAILABLE and sheet_id:
+        try:
+            import psycopg2
+            with psycopg2.connect(os.environ.get("DATABASE_URL"), sslmode="require") as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT gstin FROM companies WHERE spreadsheet_id = %s LIMIT 1",
+                        (sheet_id,)
+                    )
+                    row = cur.fetchone()
+                    if row: early_gstin = row[0]
+        except Exception:
+            pass
+
+    if DB_AVAILABLE and early_gstin:
+        try:
+            # Check B2C_5 or EXEMPT as proxy for "B2C work done"
+            state = check_month_generated(month, early_gstin, invoice_type="B2C_5")
+            if not state["exists"]:
+                state = check_month_generated(month, early_gstin, invoice_type="EXEMPT")
+
+            if state["exists"]:
+                if args.force_regenerate:
+                    for itype in ("B2C_5", "B2C_18", "EXEMPT"):
+                        d = delete_month_invoices(month, early_gstin, invoice_type=itype)
+                        if d: print(f"  ⚠  Deleted {d} {itype} invoices for {month}")
+                    print(f"  Starting fresh B2C/Exempt generation...\n")
+                else:
+                    print(f"\n{'='*60}")
+                    print(f"  B2C + Exempt Invoice Generator  |  IT Maverick Solutions")
+                    print(f"{'='*60}")
+                    print(f"  ℹ  Month {month[:2]}/{month[2:]} already generated for {early_gstin}")
+                    print(f"  ℹ  Found: {state['count']} invoices")
+                    print(f"  ℹ  Range: {state['invoice_from']} → {state['invoice_to']}")
+                    print(f"  ℹ  Returning existing data (use --force-regenerate to overwrite)")
+                    print(f"{'='*60}\n")
+                    print(f"EXISTING_DATA: count={state['count']} from={state['invoice_from']} to={state['invoice_to']}")
+                    sys.exit(0)
+        except Exception as e:
+            print(f"  ⚠ DB state check failed: {e} — proceeding normally")
 
     # ── SHEETS MODE ──────────────────────────────────────────
     if use_sheets:

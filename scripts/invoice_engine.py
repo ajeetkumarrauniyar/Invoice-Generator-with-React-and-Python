@@ -67,7 +67,10 @@ except ImportError:
 
 # DB integration — optional (graceful fallback agar .env nahi mila)
 try:
-    from db import get_last_invoice_number, save_invoices, upsert_party
+    from db import (
+        get_last_invoice_number, save_invoices, upsert_party,
+        check_month_generated, delete_month_invoices, get_invoices_for_month,
+    )
     DB_AVAILABLE = True
 except Exception:
     DB_AVAILABLE = False
@@ -437,14 +440,17 @@ def main():
     # Legacy positional args (local Excel mode)
     p.add_argument("workbook", nargs="?", default=None, help="Path to Excel workbook (local mode)")
     p.add_argument("month_pos", nargs="?", default=None, help="MMYYYY positional (local mode)")
-    # New named args (Sheets / web mode)
-    p.add_argument("--month",    default=None, help="MMYYYY e.g. 062026")
-    p.add_argument("--gstin",          default=None, help="Supplier GSTIN (overrides sheet M1)")
-    p.add_argument("--sheet-id",       default=None, help="Google Sheets spreadsheet ID")
-    p.add_argument("--planning-sheet", default="Master Working - FY 2026-27",
-                   help="Sheet tab name for Sales Planning (default: 'Master Working - FY 2026-27')")
-    p.add_argument("--outfile",  default=None, help="Output xlsx path (local mode only)")
-    p.add_argument("--inplace",  action="store_true")
+    # Named args (Sheets / web mode)
+    p.add_argument("--month",             default=None, help="MMYYYY e.g. 062026")
+    p.add_argument("--gstin",             default=None, help="Supplier GSTIN (overrides sheet M1)")
+    p.add_argument("--sheet-id",          default=None, help="Google Sheets spreadsheet ID")
+    p.add_argument("--planning-sheet",    default="Master Working - FY 2026-27",
+                   help="Sheet tab name for Sales Planning")
+    p.add_argument("--outfile",           default=None, help="Output xlsx path (local mode only)")
+    p.add_argument("--inplace",           action="store_true")
+    p.add_argument("--force-regenerate",  action="store_true",
+                   help="Delete existing data for this month and regenerate fresh. "
+                        "WARNING: destroys previous invoices for this fp+gstin.")
     args = p.parse_args()
 
     # Resolve month from positional or named arg
@@ -454,6 +460,79 @@ def main():
 
     sheet_id  = args.sheet_id or os.environ.get("SHEET_ID")
     use_sheets = bool(sheet_id)
+
+    # ── STATE CHECK: already generated? ─────────────────────────────────
+    # Resolve supplier_gstin early so we can do the DB check
+    early_gstin = args.gstin
+    if not early_gstin and DB_AVAILABLE:
+        # Try to get from companies table using sheet_id
+        if sheet_id:
+            try:
+                with __import__('psycopg2').connect(
+                    __import__('os').environ.get("DATABASE_URL"), sslmode="require"
+                ) as conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            "SELECT gstin FROM companies WHERE spreadsheet_id = %s LIMIT 1",
+                            (sheet_id,)
+                        )
+                        row = cur.fetchone()
+                        if row:
+                            early_gstin = row[0]
+            except Exception:
+                pass
+
+    if DB_AVAILABLE and early_gstin:
+        try:
+            state = check_month_generated(month, early_gstin, invoice_type="B2B")
+            if state["exists"]:
+                if args.force_regenerate:
+                    # DELETE existing data first, then proceed with fresh generation
+                    deleted = delete_month_invoices(month, early_gstin, invoice_type="B2B")
+                    print(f"\n  ⚠  --force-regenerate: deleted {deleted} existing B2B invoices for {month}")
+                    print(f"  Starting fresh generation...\n")
+                else:
+                    # LOCK & FETCH mode — return existing data, no new generation
+                    print(f"\n{'='*60}")
+                    print(f"  B2B Invoice Engine  |  IT Maverick Solutions")
+                    print(f"{'='*60}")
+                    print(f"  ℹ  Month {month[:2]}/{month[2:]} already generated for {early_gstin}")
+                    print(f"  ℹ  Found: {state['count']} invoices")
+                    print(f"  ℹ  Range: {state['invoice_from']} → {state['invoice_to']}")
+                    print(f"  ℹ  Returning existing data (use --force-regenerate to overwrite)")
+                    print(f"{'='*60}\n")
+                    # Output machine-readable marker for route.js
+                    print(f"EXISTING_DATA: count={state['count']} from={state['invoice_from']} to={state['invoice_to']}")
+                    sys.exit(0)
+        except Exception as e:
+            # DB check failed — continue with normal flow
+            print(f"  ⚠ DB state check failed: {e} — proceeding with normal generation")
+
+    # ── RESOLVE STARTING INVOICE NUMBER ─────────────────────────────────
+    # For --force-regenerate: find the invoice number used at the START
+    # of this month in a previous run, so numbers don't jump forward.
+    # Logic: look at the PREVIOUS month's last invoice number in DB,
+    # then start from there + 1. This prevents sequence runaway.
+    if DB_AVAILABLE and args.force_regenerate and early_gstin:
+        try:
+            # Find what number was used before this month
+            with __import__('psycopg2').connect(
+                __import__('os').environ.get("DATABASE_URL"), sslmode="require"
+            ) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT MAX(invoice_no) FROM invoices
+                        WHERE supplier_gstin = %s
+                          AND fp < %s
+                          AND series = 'ME'
+                          AND is_cancelled = FALSE
+                    """, (early_gstin, month))
+                    row = cur.fetchone()
+                    if row and row[0]:
+                        # Override: set the last known number so next detection picks up correctly
+                        os.environ["_FORCE_REGEN_LAST_INVOICE"] = row[0]
+        except Exception:
+            pass
 
     # ── SHEETS MODE ─────────────────────────────────────────
     if use_sheets:

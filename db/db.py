@@ -189,7 +189,68 @@ def mark_json_exported(fp: str, supplier_gstin: str) -> int:
 # MONTHLY SUMMARY
 # ─────────────────────────────────────────────
 
-def get_monthly_summary(fp: str, supplier_gstin: str) -> dict | None:
+def check_month_generated(fp: str, supplier_gstin: str, invoice_type: str = None) -> dict:
+    """
+    Checks if invoices already exist in DB for a given month + supplier.
+    Returns dict with:
+      - exists: bool
+      - count: int (number of invoices found)
+      - series: list of invoice series found (e.g. ['ME', 'CM'])
+      - invoice_from: first invoice no
+      - invoice_to: last invoice no
+
+    Use this BEFORE generating to prevent duplicate data.
+    invoice_type: 'B2B' | 'B2C_5' | 'B2C_18' | 'EXEMPT' | None (all)
+    """
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            query = """
+                SELECT
+                    COUNT(*) as count,
+                    array_agg(DISTINCT series) as series,
+                    MIN(invoice_no) as invoice_from,
+                    MAX(invoice_no) as invoice_to
+                FROM invoices
+                WHERE fp = %s AND supplier_gstin = %s AND is_cancelled = FALSE
+            """
+            params = [fp, supplier_gstin]
+            if invoice_type:
+                query += " AND invoice_type = %s"
+                params.append(invoice_type)
+
+            cur.execute(query, params)
+            row = cur.fetchone()
+            count = row[0] if row else 0
+            return {
+                "exists":       count > 0,
+                "count":        count,
+                "series":       row[1] if row and row[1] else [],
+                "invoice_from": row[2] if row else None,
+                "invoice_to":   row[3] if row else None,
+            }
+
+
+def delete_month_invoices(fp: str, supplier_gstin: str, invoice_type: str = None) -> int:
+    """
+    Deletes invoices for a month (for re-generation).
+    Returns count of deleted rows.
+    Use with caution — only if user explicitly confirms regeneration.
+    invoice_type: 'B2B' | None (all B2B) etc.
+    """
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            query = "DELETE FROM invoices WHERE fp = %s AND supplier_gstin = %s"
+            params = [fp, supplier_gstin]
+            if invoice_type:
+                query += " AND invoice_type = %s"
+                params.append(invoice_type)
+            cur.execute(query, params)
+            count = cur.rowcount
+        conn.commit()
+        return count
+
+
+
     """
     Monthly summary view se data nikalta hai.
     Sales Records screen aur dashboard ke liye.
