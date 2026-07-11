@@ -148,9 +148,20 @@ def detect_next_invoice_number(wb, supplier_gstin=None):
     """
     Next ME invoice number auto-detect karta hai.
     Priority:
-      1. NeonDB (agar available hai) — most reliable, har mahine sahi rahega
-      2. B2B-SALES-RECORDS sheet scan — fallback agar DB nahi mila
+      1. Force-regen override (previous month's last number)
+      2. NeonDB (agar available hai)
+      3. B2B-SALES-RECORDS sheet scan — fallback
     """
+    # Force-regenerate case: use previous month's last invoice as base
+    override = os.environ.get("_FORCE_REGEN_LAST_INVOICE")
+    if override:
+        m = INVOICE_NO_PATTERN.match(override)
+        if m:
+            prefix, digits = m.group(1), m.group(2)
+            next_num = int(digits) + 1
+            print(f"  (Invoice number reset for regeneration: previous month last={override})")
+            return f"{prefix}{str(next_num).zfill(len(digits))}"
+
     if DB_AVAILABLE and supplier_gstin:
         last = get_last_invoice_number(supplier_gstin, "ME")
         if last:
