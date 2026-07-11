@@ -255,13 +255,13 @@ export default function GSTPlanner() {
           to: data.invoiceTo,
           count: data.totalInvoices,
         });
-        const { files } = data;
-        if (files?.cashRecordsCsv)
-          downloadFile(
-            files.cashRecordsCsv,
-            "cash_sales_records.csv",
-            "text/csv",
-          );
+        // const { files } = data;
+        // if (files?.cashRecordsCsv)
+        //   downloadFile(
+        //     files.cashRecordsCsv,
+        //     "cash_sales_records.csv",
+        //     "text/csv",
+        //   );
         toast({
           title: `B2C done — ${data.totalInvoices} invoices`,
           description: `${data.invoiceFrom} → ${data.invoiceTo}`,
